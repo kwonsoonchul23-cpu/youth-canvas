@@ -62,8 +62,8 @@ def get_date_label(task_dict):
     elif sd and sd != "-": return f"[{sd}] "
     return ""
 
-# --- 영구 데이터베이스 세팅 (v18: 세부 목표 subtasks 구조 추가) ---
-DATA_FILE = "program_data_v18.json"
+# --- 영구 데이터베이스 세팅 (v19) ---
+DATA_FILE = "program_data_v19.json"
 
 today_str = datetime.now().strftime("%Y-%m-%d")
 
@@ -71,21 +71,9 @@ def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    elif os.path.exists("program_data_v17.json") or os.path.exists("program_data_v16.json"):
-        # 하위 버전 마이그레이션 로직
-        for v in ["v17", "v16", "v15", "v14"]:
-            if os.path.exists(f"program_data_{v}.json"):
-                with open(f"program_data_{v}.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    # 이전 데이터에 세부목표(subtasks) 빈 리스트 추가
-                    for p in data.get('programs', []):
-                        for role, tasks in p.get('roles_workflow', {}).items():
-                            for t in tasks:
-                                if 'subtasks' not in t: t['subtasks'] = []
-                    for u in data.get('users', []):
-                        for t in u.get('workflow', []):
-                            if 'subtasks' not in t: t['subtasks'] = []
-                    return data
+    elif os.path.exists("program_data_v18.json"):
+        with open("program_data_v18.json", "r", encoding="utf-8") as f:
+            return json.load(f)
     else:
         return {
             "programs": [], "users": [], 
@@ -164,7 +152,6 @@ if st.session_state.menu_option == "1. 🏠 둘러보기 (메인)":
                         label = get_date_label(t)
                         date_val = label if label else "일정 미정"
                         
-                        # ✨ 세부 목표가 있다면 괄호 안에 합쳐서 표에 보여줌
                         sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
                         if sub_texts:
                             task_display = f"{t['task']} <br><span style='color:gray;font-size:0.85em;'>└ {', '.join(sub_texts)}</span>"
@@ -249,7 +236,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                         elif "마감" in selected_role_str: st.error("정원이 마감되었습니다.")
                         else:
                             actual_role = selected_role_str.split(" (")[0]
-                            # ✨ deepcopy를 사용하여 세부목표 리스트까지 안전하게 학생에게 복사
                             my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
                             db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "alias": "", "attendance": {}})
                             save_data(db); st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요."); st.rerun()
@@ -272,7 +258,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                         st.markdown(f"<span class='badge-blue'>나의 담당 역할: {data['role']}</span>", unsafe_allow_html=True)
                         st.write("")
                         
-                        # ✨ 성취율 계산: 메인 과업 + 세부 목표 전체 개수로 계산
                         total_items = 0; done_items = 0
                         for t in data['workflow']:
                             total_items += 1
@@ -286,7 +271,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                         st.metric("전체 활동 성취율", f"{pct}%", f"{done_items} / {total_items} 개 달성")
                         st.progress(pct / 100)
                         
-                        # ✨ 60% 이하일 때 경고 메시지 표시
                         if pct <= 60:
                             st.warning("⚠️ **현재 활동 성취율이 60% 이하입니다.** 어려운 점이 있다면 아래 게시판을 통해 선생님과 소통해 보세요!")
                         else:
@@ -302,12 +286,10 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                             changed = False
                             for idx, t in enumerate(data['workflow']):
                                 label = f"{get_date_label(t)}{t['task']}"
-                                # 메인 과업 체크박스
                                 is_done = st.checkbox(f"**{label}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{idx}")
                                 if is_done != t.get('done'):
                                     t['done'] = is_done; changed = True
                                 
-                                # 세부 과업(subtasks) 들여쓰기 체크박스
                                 for s_idx, stask in enumerate(t.get('subtasks', [])):
                                     col_empty, col_chk = st.columns([1, 20])
                                     with col_chk:
@@ -396,7 +378,6 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                 if filtered_users:
                     overview_data = []
                     for u in filtered_users:
-                        # ✨ 전체 문항수 기반 성취율 계산 업데이트
                         tot_i = 0; don_i = 0
                         for t in u['workflow']:
                             tot_i += 1
@@ -563,7 +544,6 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                         col_info, col_chat = st.columns([1, 1])
                         with col_info:
                             with st.container(border=True):
-                                # ✨ 성취율 경고 시스템 (관리자도 확인 가능)
                                 tot_i = 0; don_i = 0
                                 for t in target_user['workflow']:
                                     tot_i += 1
@@ -583,7 +563,6 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                     if is_done != t.get('done'):
                                         target_user['workflow'][t_idx]['done'] = is_done; changed_admin = True
                                         
-                                    # 관리자도 세부 목표 체크 컨트롤 가능
                                     for s_idx, stask in enumerate(t.get('subtasks', [])):
                                         ce, cc = st.columns([1, 20])
                                         with cc:
@@ -612,61 +591,7 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                         target_user.setdefault('messages', []).append({"sender": "admin", "content": reply_input})
                                         save_data(db); st.rerun()
 
-        # ✨ [개선] 신규 프로그램 개설 폼에서 세부 목표 작성 방법 안내
-        with tab_create:
-            with st.container(border=True):
-                with st.form("create_form"):
-                    colA, colB = st.columns([8, 2])
-                    t = colA.text_input("프로그램 명")
-                    prog_color = colB.color_picker("캘린더 색상", "#4f46e5")
-                    
-                    st.write("🗓️ **모집 기간 설정**")
-                    colD1, colD2 = st.columns(2)
-                    r_start = colD1.date_input("모집 시작일")
-                    r_end = colD2.date_input("모집 종료일")
-                    
-                    d = st.text_area("프로그램 소개글 (카드에 표시됨)")
-                    v = st.text_input("유튜브 링크")
-                    st.info("📌 작성 양식 (기간은 물결 ~, 세부 목표는 대시 - 사용)\n[역할명 : 정원]\nYYYY-MM-DD ~ YYYY-MM-DD : 메인 과업\n- 프리미어프로 기초 익히기 (세부 목표 1)\n- 단축키 외우기 (세부 목표 2)")
-                    w_input = st.text_area("역할 및 워크플로우 설정", height=250)
-                    
-                    if st.form_submit_button("프로그램 개설하기", type="primary"):
-                        parsed_w = {}; parsed_c = {}; curr_r = None
-                        for line in w_input.split('\n'):
-                            line = line.strip()
-                            if not line: continue
-                            if line.startswith('[') and ']' in line:
-                                content = line[1:line.find(']')]
-                                curr_r = content.split(':')[0].strip()
-                                parsed_c[curr_r] = int(re.sub(r'[^0-9]', '', content.split(':')[1])) if ':' in content else 10
-                                parsed_w[curr_r] = []
-                            elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
-                                dt_part, tk = line.split(':', 1)
-                                dt_part = dt_part.strip()
-                                if '~' in dt_part:
-                                    sd, ed = dt_part.split('~', 1)
-                                    parsed_w[curr_r].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False})
-                                else:
-                                    parsed_w[curr_r].append({"start_date": dt_part, "end_date": dt_part, "task": tk.strip(), "subtasks": [], "done": False})
-                            elif curr_r and (line.startswith('-') or line.startswith('*')):
-                                # ✨ 하위 태스크(세부 목표) 파싱
-                                sub_desc = line[1:].strip()
-                                if parsed_w[curr_r]: # 메인 과업이 위에 존재할 경우에만
-                                    parsed_w[curr_r][-1]["subtasks"].append({"desc": sub_desc, "done": False})
-                                    
-                        db['programs'].append({
-                            "title": t, "desc": d, "video": v, "color": prog_color, 
-                            "recruit_start": r_start.strftime("%Y-%m-%d"),
-                            "recruit_end": r_end.strftime("%Y-%m-%d"),
-                            "roles_capacity": parsed_c, "roles_workflow": parsed_w
-                        })
-                        if not is_super:
-                            admin_in_db = next(a for a in db['admins'] if a['name'] == admin_info['name'])
-                            admin_in_db.setdefault('programs', []).append(t)
-                            st.session_state['logged_admin']['programs'].append(t)
-                        save_data(db); st.success("개설 완료!"); st.rerun()
-
-        # ✨ [개선] 수정 탭에서 세부 목표 텍스트로 잘 불러오기
+        # ✨ 수정 기능 (tab_edit) 에러 픽스 및 기존 학생 데이터 자동 동기화 적용 ✨
         with tab_edit:
             if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
             else:
@@ -685,10 +610,8 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                             elif sd and sd != "-": initial_w += f"{sd} : {t['task']}\n"
                             else: initial_w += f"{t['task']}\n"
                             
-                            # 세부 목표 텍스트 렌더링
                             for stask in t.get('subtasks', []):
                                 initial_w += f"- {stask['desc']}\n"
-                                
                         initial_w += "\n"
 
                     with st.form("edit_form"):
@@ -721,6 +644,7 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                 elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
                                     dt_part, tk = line.split(':', 1)
                                     dt_part = dt_part.strip()
+                                    # ✨ 버그 픽스: subtasks 빈 리스트 추가 보장
                                     if '~' in dt_part:
                                         sd, ed = dt_part.split('~', 1)
                                         parsed_w[curr_r].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False})
@@ -729,20 +653,44 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                 elif curr_r and (line.startswith('-') or line.startswith('*')):
                                     sub_desc = line[1:].strip()
                                     if parsed_w[curr_r]: 
+                                        if "subtasks" not in parsed_w[curr_r][-1]:
+                                            parsed_w[curr_r][-1]["subtasks"] = []
                                         parsed_w[curr_r][-1]["subtasks"].append({"desc": sub_desc, "done": False})
                             
-                            if new_t != p_data['title']:
+                            old_title = p_data['title']
+                            
+                            # 1. 관리자 담당 프로그램 이름 업데이트
+                            if new_t != old_title:
                                 for a in db['admins']:
-                                    if p_data['title'] in a.get('programs', []):
-                                        a['programs'] = [new_t if x == p_data['title'] else x for x in a['programs']]
+                                    if old_title in a.get('programs', []):
+                                        a['programs'] = [new_t if x == old_title else x for x in a['programs']]
                                         
+                            # ✨ 2. 기존 가입 학생들에게 변경된 워크플로우 자동 동기화 (기존 체크 상태 유지)
+                            for u in db['users']:
+                                if u['program'] == old_title:
+                                    u['program'] = new_t # 프로그램 이름 변경 동기화
+                                    if u['role'] in parsed_w:
+                                        new_user_workflow = copy.deepcopy(parsed_w[u['role']])
+                                        # 기존에 학생이 체크해둔 완료 상태를 복원
+                                        for new_t_dict in new_user_workflow:
+                                            for old_t_dict in u['workflow']:
+                                                if new_t_dict['task'] == old_t_dict['task']:
+                                                    new_t_dict['done'] = old_t_dict.get('done', False)
+                                                    # 세부 목표 체크 상태 복원
+                                                    for new_st_dict in new_t_dict.get('subtasks', []):
+                                                        for old_st_dict in old_t_dict.get('subtasks', []):
+                                                            if new_st_dict['desc'] == old_st_dict['desc']:
+                                                                new_st_dict['done'] = old_st_dict.get('done', False)
+                                        u['workflow'] = new_user_workflow
+                            
+                            # 3. 프로그램 템플릿에 최종 저장
                             db['programs'][p_idx] = {
                                 "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
                                 "recruit_start": new_r_start.strftime("%Y-%m-%d"),
                                 "recruit_end": new_r_end.strftime("%Y-%m-%d"),
                                 "roles_capacity": parsed_c, "roles_workflow": parsed_w
                             }
-                            save_data(db); st.success("수정 완료! 보안을 위해 다시 로그인해주세요."); st.session_state['admin_logged_in'] = False; st.rerun()
+                            save_data(db); st.success("수정 완료 및 학생 데이터 동기화 성공! 보안을 위해 다시 로그인해주세요."); st.session_state['admin_logged_in'] = False; st.rerun()
 
         with tab_settings:
             with st.container(border=True):
