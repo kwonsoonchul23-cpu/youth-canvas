@@ -1,0 +1,552 @@
+{
+    "programs": [
+        {
+            "title": "AI 유튜브 영상 제작",
+            "desc": "ai를 이해하고 영상을 만들어 꾸준히 업로드한다",
+            "video": "https://youtu.be/4L5XjdeoI54",
+            "color": "#4f46e5",
+            "recruit_start": "2026-02-20",
+            "recruit_end": "2026-03-21",
+            "roles_capacity": {
+                "기획/대본": 5,
+                "촬영": 5,
+                "배우": 5,
+                "편집": 5
+            },
+            "roles_workflow": {
+                "기획/대본": [
+                    {
+                        "start_date": "2026-03-01",
+                        "end_date": "2026-03-01",
+                        "task": "주제 선정 및 아이디어 회의",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-08",
+                        "end_date": "2026-03-08",
+                        "task": "대본 초안 작성",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-15",
+                        "end_date": "2026-03-15",
+                        "task": "최종 대본 완성",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-22",
+                        "end_date": "2026-03-22",
+                        "task": "1차 수정",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-29",
+                        "end_date": "2026-03-29",
+                        "task": "2차 수정",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-05",
+                        "end_date": "2026-04-05",
+                        "task": "3차 수정",
+                        "done": false
+                    }
+                ],
+                "촬영": [
+                    {
+                        "start_date": "2026-03-22",
+                        "end_date": "2026-03-22",
+                        "task": "카메라 세팅법 학습",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-29",
+                        "end_date": "2026-03-29",
+                        "task": "본 촬영",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-05",
+                        "end_date": "2026-04-05",
+                        "task": "추가 촬영",
+                        "done": false
+                    }
+                ],
+                "배우": [
+                    {
+                        "start_date": "2026-03-22",
+                        "end_date": "2026-03-22",
+                        "task": "촬영대본 숙지, 리허설",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-29",
+                        "end_date": "2026-03-29",
+                        "task": "본 촬영",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-05",
+                        "end_date": "2026-04-05",
+                        "task": "추가 촬영",
+                        "done": false
+                    }
+                ],
+                "편집": [
+                    {
+                        "start_date": "2026-04-12",
+                        "end_date": "2026-04-12",
+                        "task": "1차 편집",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-19",
+                        "end_date": "2026-04-19",
+                        "task": "1차 편집",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-26",
+                        "end_date": "2026-04-26",
+                        "task": "1차 시연",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-05-03",
+                        "end_date": "2026-05-03",
+                        "task": "2차 편집",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-05-10",
+                        "end_date": "2026-05-10",
+                        "task": "2차 편집",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-05-17",
+                        "end_date": "2026-05-17",
+                        "task": "2차 시연",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-05-24",
+                        "end_date": "2026-05-24",
+                        "task": "3차 편집",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-05-31",
+                        "end_date": "2026-05-31",
+                        "task": "3차 편집 & 완료/평가",
+                        "done": false
+                    }
+                ]
+            }
+        },
+        {
+            "title": "내일은 내가 K-POP 스타",
+            "desc": "전문 K-POP 안무가와 함께 최신의 안무를 배운다",
+            "video": "https://youtu.be/BuSEXqdD5FE?si=82g-xgHkvJO4uxUU",
+            "color": "#46e573",
+            "recruit_start": "2026-02-20",
+            "recruit_end": "2026-02-28",
+            "roles_capacity": {
+                "수강생": 10
+            },
+            "roles_workflow": {
+                "수강생": [
+                    {
+                        "start_date": "2026-03-01",
+                        "end_date": "2026-03-07",
+                        "task": "1차 강습",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-08",
+                        "end_date": "2026-03-14",
+                        "task": "2차 강습",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-15",
+                        "end_date": "2026-03-21",
+                        "task": "3차 강습",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-22",
+                        "end_date": "2026-03-28",
+                        "task": "1차 평가",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-29",
+                        "end_date": "2026-04-04",
+                        "task": "4차 수정",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-05",
+                        "end_date": "2026-04-11",
+                        "task": "5차 수정",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-12",
+                        "end_date": "2026-04-18",
+                        "task": "6차 편집",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-19",
+                        "end_date": "2026-04-25",
+                        "task": "최종 평가",
+                        "done": false
+                    }
+                ]
+            }
+        },
+        {
+            "title": "고독한 독서가",
+            "desc": "다양한 장소에서 함께 독서하고 나누다",
+            "video": "https://www.youtube.com/watch?v=9N_zHagAD4I",
+            "color": "#e58146",
+            "recruit_start": "2026-02-20",
+            "recruit_end": "2026-02-28",
+            "roles_capacity": {
+                "독서가": 8
+            },
+            "roles_workflow": {
+                "독서가": [
+                    {
+                        "start_date": "2026-03-01",
+                        "end_date": "2026-03-07",
+                        "task": "OT & 책선정",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-08",
+                        "end_date": "2026-03-14",
+                        "task": "1차 독서 + 나눔",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-15",
+                        "end_date": "2026-03-21",
+                        "task": "2차 독서 + 나눔",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-22",
+                        "end_date": "2026-03-28",
+                        "task": "3차 독서 + 나눔",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-03-29",
+                        "end_date": "2026-04-04",
+                        "task": "4차 독서 + 나눔",
+                        "done": false
+                    },
+                    {
+                        "start_date": "2026-04-05",
+                        "end_date": "2026-04-11",
+                        "task": "5차 독서 + 나눔",
+                        "done": false
+                    }
+                ]
+            }
+        }
+    ],
+    "users": [
+        {
+            "name": "권해리",
+            "pin": "0000",
+            "program": "AI 유튜브 영상 제작",
+            "role": "기획/대본",
+            "workflow": [
+                {
+                    "start_date": "2026-03-01",
+                    "end_date": "2026-03-01",
+                    "task": "주제 선정 및 아이디어 회의",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-08",
+                    "end_date": "2026-03-08",
+                    "task": "대본 초안 작성",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-15",
+                    "end_date": "2026-03-15",
+                    "task": "최종 대본 완성",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-22",
+                    "end_date": "2026-03-22",
+                    "task": "1차 수정",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-29",
+                    "end_date": "2026-03-29",
+                    "task": "2차 수정",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-05",
+                    "end_date": "2026-04-05",
+                    "task": "3차 수정",
+                    "done": false
+                }
+            ],
+            "messages": [
+                {
+                    "sender": "user",
+                    "content": "여기 잘 되요?"
+                }
+            ],
+            "attendance": {}
+        },
+        {
+            "name": "김해리",
+            "pin": "0000",
+            "program": "내일은 내가 K-POP 스타",
+            "role": "수강생",
+            "workflow": [
+                {
+                    "start_date": "2026-03-01",
+                    "end_date": "2026-03-07",
+                    "task": "1차 강습",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-08",
+                    "end_date": "2026-03-14",
+                    "task": "2차 강습",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-15",
+                    "end_date": "2026-03-21",
+                    "task": "3차 강습",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-22",
+                    "end_date": "2026-03-28",
+                    "task": "1차 평가",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-29",
+                    "end_date": "2026-04-04",
+                    "task": "4차 수정",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-05",
+                    "end_date": "2026-04-11",
+                    "task": "5차 수정",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-12",
+                    "end_date": "2026-04-18",
+                    "task": "6차 편집",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-19",
+                    "end_date": "2026-04-25",
+                    "task": "최종 평가",
+                    "done": false
+                }
+            ],
+            "messages": [
+                {
+                    "sender": "user",
+                    "content": "진짜 어려워요"
+                },
+                {
+                    "sender": "admin",
+                    "content": "그건 이렇게 해요"
+                }
+            ],
+            "attendance": {
+                "2026-02-20": {
+                    "status": "출석",
+                    "note": ""
+                }
+            }
+        },
+        {
+            "name": "이해리",
+            "pin": "0000",
+            "program": "고독한 독서가",
+            "role": "독서가",
+            "workflow": [
+                {
+                    "start_date": "2026-03-01",
+                    "end_date": "2026-03-07",
+                    "task": "OT & 책선정",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-08",
+                    "end_date": "2026-03-14",
+                    "task": "1차 독서 + 나눔",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-15",
+                    "end_date": "2026-03-21",
+                    "task": "2차 독서 + 나눔",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-22",
+                    "end_date": "2026-03-28",
+                    "task": "3차 독서 + 나눔",
+                    "done": true
+                },
+                {
+                    "start_date": "2026-03-29",
+                    "end_date": "2026-04-04",
+                    "task": "4차 독서 + 나눔",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-05",
+                    "end_date": "2026-04-11",
+                    "task": "5차 독서 + 나눔",
+                    "done": false
+                }
+            ],
+            "messages": [
+                {
+                    "sender": "user",
+                    "content": "이번에는 이거 읽어요"
+                },
+                {
+                    "sender": "admin",
+                    "content": "그래요 그럽시다"
+                }
+            ],
+            "attendance": {
+                "2026-02-20": {
+                    "status": "병결",
+                    "note": "치과"
+                }
+            }
+        },
+        {
+            "name": "김해리",
+            "pin": "1234",
+            "program": "내일은 내가 K-POP 스타",
+            "role": "수강생",
+            "workflow": [
+                {
+                    "start_date": "2026-03-01",
+                    "end_date": "2026-03-07",
+                    "task": "1차 강습",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-08",
+                    "end_date": "2026-03-14",
+                    "task": "2차 강습",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-15",
+                    "end_date": "2026-03-21",
+                    "task": "3차 강습",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-22",
+                    "end_date": "2026-03-28",
+                    "task": "1차 평가",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-03-29",
+                    "end_date": "2026-04-04",
+                    "task": "4차 수정",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-05",
+                    "end_date": "2026-04-11",
+                    "task": "5차 수정",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-12",
+                    "end_date": "2026-04-18",
+                    "task": "6차 편집",
+                    "done": false
+                },
+                {
+                    "start_date": "2026-04-19",
+                    "end_date": "2026-04-25",
+                    "task": "최종 평가",
+                    "done": false
+                }
+            ],
+            "messages": [
+                {
+                    "sender": "user",
+                    "content": "제가 최근에 왔어요"
+                }
+            ],
+            "alias": "김해리2",
+            "attendance": {
+                "2026-02-20": {
+                    "status": "지각",
+                    "note": "늦잠"
+                }
+            }
+        }
+    ],
+    "admins": [
+        {
+            "name": "마스터",
+            "pin": "1234",
+            "role": "super",
+            "programs": []
+        },
+        {
+            "name": "석남일",
+            "pin": "0000",
+            "role": "normal",
+            "programs": [
+                "AI 유튜브 영상 제작"
+            ]
+        },
+        {
+            "name": "박상진",
+            "pin": "0000",
+            "role": "normal",
+            "programs": [
+                "내일은 내가 K-POP 스타"
+            ]
+        },
+        {
+            "name": "이순신",
+            "pin": "1234",
+            "role": "normal",
+            "programs": [
+                "고독한 독서가"
+            ]
+        }
+    ],
+    "settings": {
+        "recruit_start": "2026-01-01",
+        "recruit_end": "2026-12-31"
+    }
+}
