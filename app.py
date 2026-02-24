@@ -62,8 +62,8 @@ def get_date_label(task_dict):
     elif sd and sd != "-": return f"[{sd}] "
     return ""
 
-# --- 영구 데이터베이스 세팅 (v19) ---
-DATA_FILE = "program_data_v19.json"
+# --- 영구 데이터베이스 세팅 (v20) ---
+DATA_FILE = "program_data_v20.json"
 
 today_str = datetime.now().strftime("%Y-%m-%d")
 
@@ -71,9 +71,20 @@ def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    elif os.path.exists("program_data_v18.json"):
-        with open("program_data_v18.json", "r", encoding="utf-8") as f:
-            return json.load(f)
+    elif os.path.exists("program_data_v19.json") or os.path.exists("program_data_v18.json"):
+        # 이전 데이터 연동
+        for v in ["v19", "v18", "v17"]:
+            if os.path.exists(f"program_data_{v}.json"):
+                with open(f"program_data_{v}.json", "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for p in data.get('programs', []):
+                        for role, tasks in p.get('roles_workflow', {}).items():
+                            for t in tasks:
+                                if 'subtasks' not in t: t['subtasks'] = []
+                    for u in data.get('users', []):
+                        for t in u.get('workflow', []):
+                            if 'subtasks' not in t: t['subtasks'] = []
+                    return data
     else:
         return {
             "programs": [], "users": [], 
@@ -591,7 +602,59 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                         target_user.setdefault('messages', []).append({"sender": "admin", "content": reply_input})
                                         save_data(db); st.rerun()
 
-        # ✨ 수정 기능 (tab_edit) 에러 픽스 및 기존 학생 데이터 자동 동기화 적용 ✨
+        # ✨ [복구 완료!] 신규 프로그램 개설 폼
+        with tab_create:
+            with st.container(border=True):
+                with st.form("create_form"):
+                    colA, colB = st.columns([8, 2])
+                    t = colA.text_input("프로그램 명")
+                    prog_color = colB.color_picker("캘린더 색상", "#4f46e5")
+                    
+                    st.write("🗓️ **모집 기간 설정**")
+                    colD1, colD2 = st.columns(2)
+                    r_start = colD1.date_input("모집 시작일")
+                    r_end = colD2.date_input("모집 종료일")
+                    
+                    d = st.text_area("프로그램 소개글 (카드에 표시됨)")
+                    v = st.text_input("유튜브 링크")
+                    st.info("📌 작성 양식 (기간은 물결 ~, 세부 목표는 대시 - 사용)\n[역할명 : 정원]\nYYYY-MM-DD ~ YYYY-MM-DD : 메인 과업\n- 프리미어프로 기초 익히기 (세부 목표 1)\n- 단축키 외우기 (세부 목표 2)")
+                    w_input = st.text_area("역할 및 워크플로우 설정", height=250)
+                    
+                    if st.form_submit_button("프로그램 개설하기", type="primary"):
+                        parsed_w = {}; parsed_c = {}; curr_r = None
+                        for line in w_input.split('\n'):
+                            line = line.strip()
+                            if not line: continue
+                            if line.startswith('[') and ']' in line:
+                                content = line[1:line.find(']')]
+                                curr_r = content.split(':')[0].strip()
+                                parsed_c[curr_r] = int(re.sub(r'[^0-9]', '', content.split(':')[1])) if ':' in content else 10
+                                parsed_w[curr_r] = []
+                            elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
+                                dt_part, tk = line.split(':', 1)
+                                dt_part = dt_part.strip()
+                                if '~' in dt_part:
+                                    sd, ed = dt_part.split('~', 1)
+                                    parsed_w[curr_r].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False})
+                                else:
+                                    parsed_w[curr_r].append({"start_date": dt_part, "end_date": dt_part, "task": tk.strip(), "subtasks": [], "done": False})
+                            elif curr_r and (line.startswith('-') or line.startswith('*')):
+                                sub_desc = line[1:].strip()
+                                if parsed_w[curr_r]: 
+                                    parsed_w[curr_r][-1]["subtasks"].append({"desc": sub_desc, "done": False})
+                                    
+                        db['programs'].append({
+                            "title": t, "desc": d, "video": v, "color": prog_color, 
+                            "recruit_start": r_start.strftime("%Y-%m-%d"),
+                            "recruit_end": r_end.strftime("%Y-%m-%d"),
+                            "roles_capacity": parsed_c, "roles_workflow": parsed_w
+                        })
+                        if not is_super:
+                            admin_in_db = next(a for a in db['admins'] if a['name'] == admin_info['name'])
+                            admin_in_db.setdefault('programs', []).append(t)
+                            st.session_state['logged_admin']['programs'].append(t)
+                        save_data(db); st.success("개설 완료!"); st.rerun()
+
         with tab_edit:
             if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
             else:
@@ -644,7 +707,6 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                 elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
                                     dt_part, tk = line.split(':', 1)
                                     dt_part = dt_part.strip()
-                                    # ✨ 버그 픽스: subtasks 빈 리스트 추가 보장
                                     if '~' in dt_part:
                                         sd, ed = dt_part.split('~', 1)
                                         parsed_w[curr_r].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False})
@@ -659,31 +721,26 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                             
                             old_title = p_data['title']
                             
-                            # 1. 관리자 담당 프로그램 이름 업데이트
                             if new_t != old_title:
                                 for a in db['admins']:
                                     if old_title in a.get('programs', []):
                                         a['programs'] = [new_t if x == old_title else x for x in a['programs']]
                                         
-                            # ✨ 2. 기존 가입 학생들에게 변경된 워크플로우 자동 동기화 (기존 체크 상태 유지)
                             for u in db['users']:
                                 if u['program'] == old_title:
-                                    u['program'] = new_t # 프로그램 이름 변경 동기화
+                                    u['program'] = new_t 
                                     if u['role'] in parsed_w:
                                         new_user_workflow = copy.deepcopy(parsed_w[u['role']])
-                                        # 기존에 학생이 체크해둔 완료 상태를 복원
                                         for new_t_dict in new_user_workflow:
                                             for old_t_dict in u['workflow']:
                                                 if new_t_dict['task'] == old_t_dict['task']:
                                                     new_t_dict['done'] = old_t_dict.get('done', False)
-                                                    # 세부 목표 체크 상태 복원
                                                     for new_st_dict in new_t_dict.get('subtasks', []):
                                                         for old_st_dict in old_t_dict.get('subtasks', []):
                                                             if new_st_dict['desc'] == old_st_dict['desc']:
                                                                 new_st_dict['done'] = old_st_dict.get('done', False)
                                         u['workflow'] = new_user_workflow
                             
-                            # 3. 프로그램 템플릿에 최종 저장
                             db['programs'][p_idx] = {
                                 "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
                                 "recruit_start": new_r_start.strftime("%Y-%m-%d"),
