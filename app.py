@@ -7,6 +7,7 @@ import calendar
 import copy
 from datetime import datetime, date
 from collections import defaultdict
+import requests # ✨ Firebase 통신을 위해 필수!
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
@@ -62,39 +63,36 @@ def get_date_label(task_dict):
     elif sd and sd != "-": return f"[{sd}] "
     return ""
 
-# --- 영구 데이터베이스 세팅 (v20) ---
-DATA_FILE = "program_data_v20.json"
-
+# ==============================================================
+# ✨ [데이터베이스 연결 로직 (Firebase 연동)] ✨
+# ==============================================================
 today_str = datetime.now().strftime("%Y-%m-%d")
 
+# 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
+# (주의: 주소 맨 끝에 반드시 '/data.json' 이라고 적혀 있어야 합니다)
+FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/"
+
 def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    elif os.path.exists("program_data_v19.json") or os.path.exists("program_data_v18.json"):
-        # 이전 데이터 연동
-        for v in ["v19", "v18", "v17"]:
-            if os.path.exists(f"program_data_{v}.json"):
-                with open(f"program_data_{v}.json", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    for p in data.get('programs', []):
-                        for role, tasks in p.get('roles_workflow', {}).items():
-                            for t in tasks:
-                                if 'subtasks' not in t: t['subtasks'] = []
-                    for u in data.get('users', []):
-                        for t in u.get('workflow', []):
-                            if 'subtasks' not in t: t['subtasks'] = []
-                    return data
-    else:
-        return {
-            "programs": [], "users": [], 
-            "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}],
-            "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
-        }
+    try:
+        response = requests.get(FIREBASE_URL)
+        if response.status_code == 200 and response.json() is not None:
+            return response.json()
+    except Exception as e:
+        st.error(f"데이터베이스 연결 오류: {e}")
+
+    # Firebase에 데이터가 없을 때 뼈대를 만들어 줍니다.
+    return {
+        "programs": [], "users": [], 
+        "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}],
+        "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
+    }
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    try:
+        requests.put(FIREBASE_URL, json=data)
+    except Exception as e:
+        st.error("데이터 저장에 실패했습니다. 인터넷 연결을 확인해주세요.")
+# ==============================================================
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
@@ -123,7 +121,7 @@ if st.session_state.menu_option == "1. 🏠 둘러보기 (메인)":
     st.markdown("## ✨ 지금 뜨고 있는 청소년 활동")
     st.write("") 
     
-    if not db['programs']: st.info("아직 개설된 프로그램이 없습니다.")
+    if not db['programs']: st.info("아직 개설된 프로그램이 없습니다. 관리자 페이지에서 프로그램을 만들어주세요.")
         
     col1, col2 = st.columns(2)
     for idx, prog in enumerate(db['programs']):
@@ -602,7 +600,6 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                                         target_user.setdefault('messages', []).append({"sender": "admin", "content": reply_input})
                                         save_data(db); st.rerun()
 
-        # ✨ [복구 완료!] 신규 프로그램 개설 폼
         with tab_create:
             with st.container(border=True):
                 with st.form("create_form"):
