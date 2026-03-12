@@ -182,7 +182,7 @@ if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
 
 # --- 사이드바 및 페이지 이동 ---
-if 'menu_option' not in st.session_state: st.session_state.menu_option = "1. 🏠 둘러보기 (메인)"
+if 'menu_option' not in st.session_state: st.session_state.menu_option = "🏠 둘러보기"
 def change_page(page_name):
     st.session_state.menu_option = page_name
     st.rerun()
@@ -192,8 +192,8 @@ with st.sidebar:
     st.caption("청소년의 꿈을 그리는 공간")
     menu = st.radio(
         "메뉴 이동", 
-        ["1. 🏠 둘러보기 (메인)", "2. 🙋 나의 활동 (청소년)", "3. 🛠️ 시설 관리자"],
-        index=["1. 🏠 둘러보기 (메인)", "2. 🙋 나의 활동 (청소년)", "3. 🛠️ 시설 관리자"].index(st.session_state.menu_option),
+        ["🏠 둘러보기", "🙋 나의 활동", "🛠️ 시설 관리자"],
+        index=["🏠 둘러보기", "🙋 나의 활동", "🛠️ 시설 관리자"].index(st.session_state.menu_option),
         label_visibility="collapsed"
     )
 st.session_state.menu_option = menu
@@ -201,7 +201,7 @@ st.session_state.menu_option = menu
 # =========================================================
 # [페이지 1] 메인 대시보드
 # =========================================================
-if st.session_state.menu_option == "1. 🏠 둘러보기 (메인)":
+if st.session_state.menu_option == "🏠 둘러보기":
     st.markdown("## ✨ 지금 뜨고 있는 청소년 활동")
     st.write("") 
     
@@ -881,3 +881,4 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                             st.rerun()
                     else:
                         st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
+
