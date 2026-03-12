@@ -69,7 +69,7 @@ def get_date_label(task_dict):
 today_str = datetime.now().strftime("%Y-%m-%d")
 
 # 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
-# (주의: 주소 맨 끝에 반드시 '/data.json' 이라고 적혀 있어야 합니다)
+# (예시: "https://youth-canvas-default-rtdb.firebaseio.com/data.json")
 FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
 
 def load_data():
@@ -261,7 +261,8 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
             if login_attempt or (search_name and search_pin):
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
                 if my_data:
-                    for data in my_data:
+                    # ✨ [에러 해결 부분] u_idx를 추가하여 중복 가입자라도 Key(이름표)가 겹치지 않게 만듦!
+                    for u_idx, data in enumerate(my_data):
                         st.divider()
                         st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님")
                         st.markdown(f"<span class='badge-blue'>나의 담당 역할: {data['role']}</span>", unsafe_allow_html=True)
@@ -295,14 +296,16 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                             changed = False
                             for idx, t in enumerate(data['workflow']):
                                 label = f"{get_date_label(t)}{t['task']}"
-                                is_done = st.checkbox(f"**{label}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{idx}")
+                                # ✨ key에 u_idx 삽입
+                                is_done = st.checkbox(f"**{label}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{u_idx}_{idx}")
                                 if is_done != t.get('done'):
                                     t['done'] = is_done; changed = True
                                 
                                 for s_idx, stask in enumerate(t.get('subtasks', [])):
                                     col_empty, col_chk = st.columns([1, 20])
                                     with col_chk:
-                                        sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"chk_sub_{search_name}_{data['program']}_{idx}_{s_idx}")
+                                        # ✨ key에 u_idx 삽입
+                                        sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"chk_sub_{search_name}_{data['program']}_{u_idx}_{idx}_{s_idx}")
                                         if sub_done != stask.get('done'):
                                             stask['done'] = sub_done; changed = True
                                             
@@ -315,7 +318,8 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                             for msg in data.get('messages', []):
                                 with st.chat_message("user" if msg['sender'] == 'user' else "assistant"):
                                     st.write(msg['content'])
-                        with st.form(f"chat_form_{data['program']}", clear_on_submit=True):
+                        # ✨ form 키에도 u_idx 삽입
+                        with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
                             c1, c2 = st.columns([8, 2])
                             msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
                             if c2.form_submit_button("전송") and msg_input:
@@ -793,5 +797,3 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                             st.rerun()
                     else:
                         st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
-
-
