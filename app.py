@@ -15,6 +15,7 @@ st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
     <style>
+    /* 기존 뱃지 및 컨텐츠 테이블 디자인 요소 */
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
@@ -32,6 +33,89 @@ st.markdown("""
     .cal-td.empty { background: #f1f5f9; }
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+    /* =========================================================
+       ✨ [새로운 모바일 앱 스타일 사이드바 CSS] ✨
+       ========================================================= */
+    /* 1. 사이드바 전체 배경색 (어두운 톤) */
+    [data-testid="stSidebar"] {
+        background-color: #2b1c36 !important;
+    }
+
+    /* 2. 사이드바 내부 좌우 여백을 없애서 컬러 블록이 화면에 꽉 차게 만듦 */
+    [data-testid="stSidebarUserContent"] {
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
+        padding-top: 2rem !important;
+    }
+
+    /* 3. 상단 로고(Youth Canvas) 영역만 여백 복구 및 글자색 흰색 변경 */
+    [data-testid="stSidebarUserContent"] h3 {
+        padding-left: 1.5rem !important;
+        color: #ffffff !important;
+    }
+    [data-testid="stSidebarUserContent"] div[data-testid="stCaptionContainer"] {
+        padding-left: 1.5rem !important;
+    }
+    [data-testid="stSidebarUserContent"] p {
+        color: #d8cce0;
+    }
+
+    /* 4. 라디오 버튼(메뉴) 그룹 사이의 빈틈(여백) 완전 제거 */
+    [data-testid="stSidebar"] [data-testid="stRadio"] > div {
+        gap: 0px !important;
+        margin-top: 2rem;
+    }
+
+    /* 5. 개별 메뉴를 거대한 블록 형태로 변형 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"] {
+        width: 100%;
+        height: 120px; /* 블록 높이 */
+        margin: 0;
+        padding: 0;
+        cursor: pointer;
+        border-radius: 0px; /* 둥근 모서리 없앰 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+
+    /* 6. 기존의 촌스러운 동그란 체크 표시 원 숨김 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child {
+        display: none !important;
+    }
+
+    /* 7. 텍스트 중앙 정렬 및 폰트 굵기/크기 조정 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) {
+        width: 100%;
+        text-align: center;
+    }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] p {
+        font-size: 1.25em !important;
+        font-weight: 800 !important;
+        color: #ffffff !important; /* 글자는 무조건 흰색 */
+        padding: 0 !important;
+        margin: 0 !important;
+        letter-spacing: 1px;
+    }
+
+    /* 8. 메뉴 순서별로 모바일 이미지와 똑같은 배경 컬러 매칭 */
+    /* 1번째 메뉴: 둘러보기 (어두운 보라색) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #3f2740; }
+    /* 2번째 메뉴: 나의 활동 (자주색) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #692d43; }
+    /* 3번째 메뉴: 관리자 (오렌지색) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #fca34d; }
+
+    /* 9. 마우스를 올렸거나 현재 탭이 선택되었을 때의 시각적 강조 효과 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { 
+        filter: brightness(1.15); 
+    }
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) {
+        box-shadow: inset 8px 0 0 0 #ffffff; /* 선택 시 왼쪽에 굵은 흰색 띠 생성 */
+        filter: brightness(1.1);
+    }
     </style>
 """, unsafe_allow_html=True)
 
