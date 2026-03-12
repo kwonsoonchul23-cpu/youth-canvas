@@ -70,7 +70,7 @@ today_str = datetime.now().strftime("%Y-%m-%d")
 
 # 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
 # (주의: 주소 맨 끝에 반드시 '/data.json' 이라고 적혀 있어야 합니다)
-FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/"
+FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
 
 def load_data():
     try:
@@ -793,3 +793,4 @@ elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
                             st.rerun()
                     else:
                         st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
+
