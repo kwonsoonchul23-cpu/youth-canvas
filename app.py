@@ -15,6 +15,11 @@ st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
     <style>
+    /* 전체 폰트를 KakaoBigSans-ExtraBold 로 우선 적용 (컴퓨터에 설치되어 있을 경우) */
+    * {
+        font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif !important;
+    }
+
     /* 기존 뱃지 및 컨텐츠 테이블 디자인 요소 */
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
@@ -39,82 +44,68 @@ st.markdown("""
        ========================================================= */
     /* 1. 사이드바 전체 배경색 (어두운 톤) */
     [data-testid="stSidebar"] {
-        background-color: #2b1c36 !important;
+        background-color: #261633 !important;
     }
 
-    /* 2. 사이드바 내부 좌우 여백을 없애서 컬러 블록이 화면에 꽉 차게 만듦 */
+    /* 2. 사이드바 내부 좌우 여백 조정 */
     [data-testid="stSidebarUserContent"] {
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
-        padding-top: 2rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 3rem !important;
     }
 
-    /* 3. 상단 로고(Youth Canvas) 영역만 여백 복구 및 글자색 흰색 변경 */
-    [data-testid="stSidebarUserContent"] h3 {
-        padding-left: 1.5rem !important;
-        color: #ffffff !important;
-    }
-    [data-testid="stSidebarUserContent"] div[data-testid="stCaptionContainer"] {
-        padding-left: 1.5rem !important;
-    }
-    [data-testid="stSidebarUserContent"] p {
-        color: #d8cce0;
-    }
-
-    /* 4. 라디오 버튼(메뉴) 그룹 사이의 빈틈(여백) 완전 제거 */
+    /* 3. 라디오 버튼(메뉴) 그룹 사이의 빈틈(여백) 줄임 */
     [data-testid="stSidebar"] [data-testid="stRadio"] > div {
-        gap: 0px !important;
-        margin-top: 2rem;
+        gap: 10px !important; 
+        margin-top: 1rem;
     }
 
-    /* 5. 개별 메뉴를 거대한 블록 형태로 변형 */
+    /* 4. 개별 메뉴를 거대한 라운드 블록 형태로 변형 */
     [data-testid="stSidebar"] label[data-baseweb="radio"] {
         width: 100%;
-        height: 120px; /* 블록 높이 */
+        height: 75px; /* 블록 높이 */
         margin: 0;
-        padding: 0;
+        padding: 0 20px;
         cursor: pointer;
-        border-radius: 0px; /* 둥근 모서리 없앰 */
+        border-radius: 12px; /* 모서리 둥글게 */
         display: flex;
-        justify-content: center;
+        justify-content: flex-start; /* 글자 왼쪽 정렬 기반 */
         align-items: center;
         transition: all 0.2s ease;
     }
 
-    /* 6. 기존의 촌스러운 동그란 체크 표시 원 숨김 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child {
-        display: none !important;
+    /* 5. 동그란 라디오 버튼(서클) 색상 흰색으로 변경하여 예쁘게 남김 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div {
+        background-color: transparent !important;
+        border-color: rgba(255,255,255,0.6) !important;
     }
 
-    /* 7. 텍스트 중앙 정렬 및 폰트 굵기/크기 조정 */
+    /* 6. 텍스트 정렬 및 폰트 굵기/크기 조정 */
     [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) {
         width: 100%;
-        text-align: center;
+        padding-left: 15px;
     }
     [data-testid="stSidebar"] label[data-baseweb="radio"] p {
-        font-size: 1.25em !important;
-        font-weight: 800 !important;
+        font-size: 1.35rem !important;
+        font-weight: 900 !important;
         color: #ffffff !important; /* 글자는 무조건 흰색 */
         padding: 0 !important;
         margin: 0 !important;
-        letter-spacing: 1px;
+        letter-spacing: 0.5px;
     }
 
-    /* 8. 메뉴 순서별로 모바일 이미지와 똑같은 배경 컬러 매칭 */
-    /* 1번째 메뉴: 둘러보기 (어두운 보라색) */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #3f2740; }
-    /* 2번째 메뉴: 나의 활동 (자주색) */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #692d43; }
-    /* 3번째 메뉴: 관리자 (오렌지색) */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #fca34d; }
+    /* 7. 메뉴 순서별로 모바일 이미지와 똑같은 배경 컬러 매칭 */
+    /* 1번째 메뉴: 찾아보기 (보라색) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; }
+    /* 2번째 메뉴: 나의 이야기 (자주색/빨강) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; }
+    /* 3번째 메뉴: 관계자 외 출입금지 (오렌지색) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #e68128; }
 
-    /* 9. 마우스를 올렸거나 현재 탭이 선택되었을 때의 시각적 강조 효과 */
+    /* 8. 마우스를 올렸거나 현재 탭이 선택되었을 때 강조 효과 */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { 
-        filter: brightness(1.15); 
-    }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) {
-        box-shadow: inset 8px 0 0 0 #ffffff; /* 선택 시 왼쪽에 굵은 흰색 띠 생성 */
-        filter: brightness(1.1);
+        transform: scale(1.02);
+        filter: brightness(1.1); 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -182,18 +173,25 @@ if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
 
 # --- 사이드바 및 페이지 이동 ---
-if 'menu_option' not in st.session_state: st.session_state.menu_option = "1. 🏠 둘러보기 (메인)"
+if 'menu_option' not in st.session_state: st.session_state.menu_option = "찾아보기 (탐색)"
 def change_page(page_name):
     st.session_state.menu_option = page_name
     st.rerun()
 
 with st.sidebar:
-    st.markdown("### 🎨 Youth Canvas")
-    st.caption("청소년의 꿈을 그리는 공간")
+    # ✨ 타이틀 및 부제목 디자인 커스텀 (보색 적용 및 크기 확대)
+    st.markdown("""
+        <div style='margin-bottom: 2rem; padding: 0 10px;'>
+            <div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div>
+            <div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # ✨ 메뉴 이름 변경 (숫자 제거)
     menu = st.radio(
         "메뉴 이동", 
-        ["1. 🏠 둘러보기 (메인)", "2. 🙋 나의 활동 (청소년)", "3. 🛠️ 시설 관리자"],
-        index=["1. 🏠 둘러보기 (메인)", "2. 🙋 나의 활동 (청소년)", "3. 🛠️ 시설 관리자"].index(st.session_state.menu_option),
+        ["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"],
+        index=["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"].index(st.session_state.menu_option),
         label_visibility="collapsed"
     )
 st.session_state.menu_option = menu
@@ -201,7 +199,7 @@ st.session_state.menu_option = menu
 # =========================================================
 # [페이지 1] 메인 대시보드
 # =========================================================
-if st.session_state.menu_option == "1. 🏠 둘러보기 (메인)":
+if st.session_state.menu_option == "찾아보기 (탐색)":
     st.markdown("## ✨ 지금 뜨고 있는 청소년 활동")
     st.write("") 
     
@@ -281,12 +279,12 @@ if st.session_state.menu_option == "1. 🏠 둘러보기 (메인)":
                 can_apply = is_recruiting_period and not is_all_full
                 if st.button("🚀 이 프로그램 지원하기", key=f"apply_{idx}", use_container_width=True, type="primary", disabled=not can_apply):
                     st.session_state['selected_prog_from_main'] = prog['title']
-                    change_page("2. 🙋 나의 활동 (청소년)")
+                    change_page("나의 이야기")
 
 # =========================================================
 # [페이지 2] 청소년 페이지
 # =========================================================
-elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
+elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 보드")
     tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 나의 목표 및 진행도 (로그인)"])
     
@@ -345,7 +343,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
             if login_attempt or (search_name and search_pin):
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
                 if my_data:
-                    # ✨ [에러 해결 부분] u_idx를 추가하여 중복 가입자라도 Key(이름표)가 겹치지 않게 만듦!
                     for u_idx, data in enumerate(my_data):
                         st.divider()
                         st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님")
@@ -380,7 +377,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                             changed = False
                             for idx, t in enumerate(data['workflow']):
                                 label = f"{get_date_label(t)}{t['task']}"
-                                # ✨ key에 u_idx 삽입
                                 is_done = st.checkbox(f"**{label}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{u_idx}_{idx}")
                                 if is_done != t.get('done'):
                                     t['done'] = is_done; changed = True
@@ -388,7 +384,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                                 for s_idx, stask in enumerate(t.get('subtasks', [])):
                                     col_empty, col_chk = st.columns([1, 20])
                                     with col_chk:
-                                        # ✨ key에 u_idx 삽입
                                         sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"chk_sub_{search_name}_{data['program']}_{u_idx}_{idx}_{s_idx}")
                                         if sub_done != stask.get('done'):
                                             stask['done'] = sub_done; changed = True
@@ -402,7 +397,6 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
                             for msg in data.get('messages', []):
                                 with st.chat_message("user" if msg['sender'] == 'user' else "assistant"):
                                     st.write(msg['content'])
-                        # ✨ form 키에도 u_idx 삽입
                         with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
                             c1, c2 = st.columns([8, 2])
                             msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
@@ -414,7 +408,7 @@ elif st.session_state.menu_option == "2. 🙋 나의 활동 (청소년)":
 # =========================================================
 # [페이지 3] 관리자 페이지
 # =========================================================
-elif st.session_state.menu_option == "3. 🛠️ 시설 관리자":
+elif st.session_state.menu_option == "관계자 외 출입금지":
     if not st.session_state.get('admin_logged_in', False):
         st.markdown("## 🔒 관리자 전용 포털")
         with st.container(border=True):
