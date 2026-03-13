@@ -95,11 +95,8 @@ st.markdown("""
     }
 
     /* 7. 메뉴 순서별로 모바일 이미지와 똑같은 배경 컬러 매칭 */
-    /* 1번째 메뉴: 찾아보기 (보라색) */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; }
-    /* 2번째 메뉴: 나의 이야기 (자주색/빨강) */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; }
-    /* 3번째 메뉴: 관계자 외 출입금지 (오렌지색) */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #e68128; }
 
     /* 8. 마우스를 올렸거나 현재 탭이 선택되었을 때 강조 효과 */
@@ -139,23 +136,26 @@ def get_date_label(task_dict):
     return ""
 
 # ==============================================================
-# ✨ [데이터베이스 연결 로직 (Firebase 연동)] ✨
+# ✨ [데이터베이스 연결 로직 (Firebase 연동 - 오류 방지 강화판!)] ✨
 # ==============================================================
 today_str = datetime.now().strftime("%Y-%m-%d")
 
-# 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
-# (예시: "https://youth-canvas-default-rtdb.firebaseio.com/data.json")
+# 선생님의 파이어베이스 주소를 하드코딩하여 오류 원천 차단!
 FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
 
 def load_data():
     try:
         response = requests.get(FIREBASE_URL)
-        if response.status_code == 200 and response.json() is not None:
-            return response.json()
+        if response.status_code == 200:
+            data = response.json()
+            if data is not None:
+                return data
+        else:
+            st.error(f"🚨 파이어베이스 접근 거부 (에러코드: {response.status_code}) - 파이어베이스 콘솔의 [규칙] 탭에서 읽기/쓰기가 true로 되어 있는지 확인해주세요.")
     except Exception as e:
-        st.error(f"데이터베이스 연결 오류: {e}")
+        st.error(f"🚨 파이어베이스 인터넷 연결 오류가 발생했습니다: {e}")
 
-    # Firebase에 데이터가 없을 때 뼈대를 만들어 줍니다.
+    # 연결에 실패했거나 완전 빈 깡통일 때만 기본 뼈대 제공 (임시 메모리 모드 작동)
     return {
         "programs": [], "users": [], 
         "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}],
@@ -164,9 +164,11 @@ def load_data():
 
 def save_data(data):
     try:
-        requests.put(FIREBASE_URL, json=data)
+        res = requests.put(FIREBASE_URL, json=data)
+        if res.status_code != 200:
+            st.error(f"🚨 데이터 클라우드 저장 실패! (에러코드: {res.status_code}) - 파이어베이스 [규칙] 탭을 확인하세요.")
     except Exception as e:
-        st.error("데이터 저장에 실패했습니다. 인터넷 연결을 확인해주세요.")
+        st.error("🚨 인터넷 문제로 데이터가 클라우드에 저장되지 않았습니다.")
 # ==============================================================
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
@@ -187,7 +189,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # ✨ 메뉴 이름 변경 (숫자 제거)
+    # ✨ 메뉴 이름
     menu = st.radio(
         "메뉴 이동", 
         ["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"],
@@ -875,4 +877,3 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             st.rerun()
                     else:
                         st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
-
