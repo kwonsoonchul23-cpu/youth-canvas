@@ -5,10 +5,10 @@ import os
 import re
 import calendar
 import copy
-import time # ✨ 딜레이 알림을 위한 추가
+import time
 from datetime import datetime, date
 from collections import defaultdict
-import requests 
+import requests # ✨ Firebase 통신을 위해 필수!
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
@@ -20,7 +20,7 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
         font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
     }
-    /* Streamlit 내부 아이콘(화살표 등) 보호 */
+    /* Streamlit 내부 아이콘 보호 */
     svg, [data-baseweb="icon"], .material-icons {
         font-family: inherit !important;
     }
@@ -86,6 +86,10 @@ def get_date_label(task_dict):
     elif sd and sd != "-": return f"[{sd}] "
     return ""
 
+def safe_key(text):
+    """✨ 파이어베이스 400 에러 방어용: 금지된 특수기호를 안전한 언더바로 변환합니다."""
+    return re.sub(r'[\.\$#\[\]/]', '_', text)
+
 # ==============================================================
 # ✨ [데이터베이스 연결 로직 (Firebase 연동 보강판!)] ✨
 # ==============================================================
@@ -99,13 +103,12 @@ def load_data():
         response = requests.get(FIREBASE_URL)
         if response.status_code == 200:
             data = response.json()
-            # 데이터가 비정상적으로 지워졌을 때를 대비한 안전망 추가
             if data and isinstance(data, dict) and 'programs' in data:
                 return data
     except Exception as e:
         st.error(f"🚨 파이어베이스 인터넷 연결 오류: {e}")
 
-    # 데이터가 꼬이거나 없을 때 기본 뼈대
+    # 데이터가 없거나 연결 실패 시 뼈대 반환
     return {
         "programs": [], "users": [], 
         "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}],
@@ -119,7 +122,8 @@ def save_data(data):
         if res.status_code == 200:
             return True
         else:
-            st.error(f"🚨 클라우드 저장 실패! (에러코드: {res.status_code})")
+            # ✨ 에러 상세 원인을 출력하도록 개선
+            st.error(f"🚨 클라우드 저장 실패! (에러코드: {res.status_code}, 상세이유: {res.text})")
             return False
     except Exception as e:
         st.error("🚨 인터넷 문제로 데이터가 클라우드에 저장되지 않았습니다.")
@@ -150,7 +154,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     
-    # ✨ 다중 창 테스트 시 덮어쓰기 방지를 위한 "동기화 버튼" 추가
+    # ✨ 동기화 버튼 (데이터 꼬임 방지용)
     st.write("")
     st.write("")
     if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
@@ -297,7 +301,6 @@ elif st.session_state.menu_option == "나의 이야기":
                             if has_full_role: 
                                 st.error("선택한 역할 중 '정원이 마감된 역할'이 포함되어 있습니다. 마감된 역할은 빼고 다시 선택해주세요.")
                             else:
-                                # 가입 처리
                                 added_count = 0
                                 for r_str in selected_role_strs:
                                     actual_role = r_str.split(" (")[0]
@@ -314,13 +317,11 @@ elif st.session_state.menu_option == "나의 이야기":
                                     })
                                     added_count += 1
                                 
-                                # 성공적으로 저장되었는지 검증
                                 if save_data(db):
                                     st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요.")
                                     time.sleep(1)
                                     st.rerun()
                                 else:
-                                    # 저장 실패 시 임시로 추가했던 데이터를 원래대로 되돌림
                                     for _ in range(added_count): db['users'].pop()
 
     with tab2:
@@ -683,7 +684,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                         target_user.setdefault('messages', []).append({"sender": "admin", "content": reply_input})
                                         if save_data(db): st.rerun()
 
-        # ✨ 신규 프로그램 개설 검증 로직 추가
+        # ✨ [오류 해결!] 특수기호 자동차단 기능이 적용된 신규 개설
         with tab_create:
             with st.container(border=True):
                 with st.form("create_form"):
@@ -708,7 +709,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             if not line: continue
                             if line.startswith('[') and ']' in line:
                                 content = line[1:line.find(']')]
-                                curr_r = content.split(':')[0].strip()
+                                raw_role = content.split(':')[0].strip()
+                                # ✨ 오류 방어막: '기획/대본' 등을 '기획_대본'으로 안전하게 변환
+                                curr_r = safe_key(raw_role) 
                                 parsed_c[curr_r] = int(re.sub(r'[^0-9]', '', content.split(':')[1])) if ':' in content else 10
                                 parsed_w[curr_r] = []
                             elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
@@ -735,7 +738,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             admin_in_db.setdefault('programs', []).append(t)
                             st.session_state['logged_admin']['programs'].append(t)
                         
-                        # 검증 후 저장 로직
                         if save_data(db):
                             st.success("✨ 클라우드 서버에 프로그램이 안전하게 개설되었습니다!")
                             time.sleep(1)
@@ -789,7 +791,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 if not line: continue
                                 if line.startswith('[') and ']' in line:
                                     content = line[1:line.find(']')]
-                                    curr_r = content.split(':')[0].strip()
+                                    raw_role = content.split(':')[0].strip()
+                                    # ✨ 오류 방어막
+                                    curr_r = safe_key(raw_role)
                                     parsed_c[curr_r] = int(re.sub(r'[^0-9]', '', content.split(':')[1])) if ':' in content else 10
                                     parsed_w[curr_r] = []
                                 elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
@@ -829,7 +833,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                                                 new_st_dict['done'] = old_st_dict.get('done', False)
                                         u['workflow'] = new_user_workflow
                             
-                            # 기존 데이터를 보존하면서 수정본으로 교체
                             temp_prog = db['programs'][p_idx]
                             db['programs'][p_idx] = {
                                 "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
