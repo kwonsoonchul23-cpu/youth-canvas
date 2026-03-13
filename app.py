@@ -15,9 +15,13 @@ st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
     <style>
-    /* 전체 폰트를 KakaoBigSans-ExtraBold 로 우선 적용 (컴퓨터에 설치되어 있을 경우) */
-    * {
-        font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif !important;
+    /* ✨ [수정됨] 글자 깨짐 방지: 폰트를 모든 요소(*)가 아닌 텍스트 관련 태그에만 안전하게 적용 */
+    h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
+        font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
+    }
+    /* Streamlit 내부 아이콘 보호 (화살표 깨짐 방지) */
+    svg, [data-baseweb="icon"], .material-icons {
+        font-family: inherit !important;
     }
 
     /* 기존 뱃지 및 컨텐츠 테이블 디자인 요소 */
@@ -140,8 +144,9 @@ def get_date_label(task_dict):
 # ==============================================================
 today_str = datetime.now().strftime("%Y-%m-%d")
 
-# 선생님의 파이어베이스 주소를 하드코딩하여 오류 원천 차단!
-FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
+# 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
+# (예시: "https://youth-canvas-default-rtdb.firebaseio.com/data.json")
+FIREBASE_URL = "https://여기에-본인-주소를-넣어주세요.firebaseio.com/data.json"
 
 def load_data():
     try:
@@ -181,7 +186,6 @@ def change_page(page_name):
     st.rerun()
 
 with st.sidebar:
-    # ✨ 타이틀 및 부제목 디자인 커스텀 (보색 적용 및 크기 확대)
     st.markdown("""
         <div style='margin-bottom: 2rem; padding: 0 10px;'>
             <div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div>
@@ -189,7 +193,6 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # ✨ 메뉴 이름
     menu = st.radio(
         "메뉴 이동", 
         ["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"],
@@ -321,17 +324,37 @@ elif st.session_state.menu_option == "나의 이야기":
                         curr = sum(1 for u in db['users'] if u['program'] == selected_prog_title and u['role'] == r)
                         role_options.append(f"{r} ({curr}/{cap}명) - {'지원가능' if curr < cap else '마감'}")
                     
-                    selected_role_str = st.selectbox("희망 역할", role_options)
+                    # ✨ [수정됨] 다중 선택(multiselect)으로 변경!
+                    selected_role_strs = st.multiselect("희망 역할 (여러 개 동시 선택 가능)", role_options)
                     
                     st.write("")
                     if st.button("✨ 최종 지원하기", use_container_width=True, type="primary"):
-                        if not user_name or not user_pin: st.error("이름과 비밀번호를 모두 입력하세요.")
-                        elif "마감" in selected_role_str: st.error("정원이 마감되었습니다.")
+                        if not user_name or not user_pin: 
+                            st.error("이름과 비밀번호를 모두 입력하세요.")
+                        elif not selected_role_strs:
+                            st.error("희망 역할을 하나 이상 선택해주세요.")
                         else:
-                            actual_role = selected_role_str.split(" (")[0]
-                            my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
-                            db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "alias": "", "attendance": {}})
-                            save_data(db); st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요."); st.rerun()
+                            has_full_role = any("마감" in r for r in selected_role_strs)
+                            if has_full_role: 
+                                st.error("선택한 역할 중 '정원이 마감된 역할'이 포함되어 있습니다. 마감된 역할은 빼고 다시 선택해주세요.")
+                            else:
+                                # ✨ 여러 역할을 선택한 만큼 반복해서 각각 독립된 데이터로 저장
+                                for r_str in selected_role_strs:
+                                    actual_role = r_str.split(" (")[0]
+                                    my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
+                                    db['users'].append({
+                                        "name": user_name, 
+                                        "pin": user_pin, 
+                                        "program": selected_prog_title, 
+                                        "role": actual_role, 
+                                        "workflow": my_tasks, 
+                                        "messages": [], 
+                                        "alias": "", 
+                                        "attendance": {}
+                                    })
+                                save_data(db)
+                                st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요.")
+                                st.rerun()
 
     with tab2:
         with st.container(border=True):
@@ -345,6 +368,7 @@ elif st.session_state.menu_option == "나의 이야기":
             if login_attempt or (search_name and search_pin):
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
                 if my_data:
+                    # 다중 역할을 가진 학생은 로그인 시 역할 수만큼 진도표가 아래로 쭉 나열됨!
                     for u_idx, data in enumerate(my_data):
                         st.divider()
                         st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님")
