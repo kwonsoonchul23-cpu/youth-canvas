@@ -5,9 +5,10 @@ import os
 import re
 import calendar
 import copy
+import time # ✨ 딜레이 알림을 위한 추가
 from datetime import datetime, date
 from collections import defaultdict
-import requests # ✨ Firebase 통신을 위해 필수!
+import requests 
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
@@ -15,16 +16,15 @@ st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
     <style>
-    /* ✨ [수정됨] 글자 깨짐 방지: 폰트를 모든 요소(*)가 아닌 텍스트 관련 태그에만 안전하게 적용 */
+    /* ✨ 글자 깨짐 방지: 텍스트 관련 태그에만 안전하게 폰트 적용 */
     h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
         font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
     }
-    /* Streamlit 내부 아이콘 보호 (화살표 깨짐 방지) */
+    /* Streamlit 내부 아이콘(화살표 등) 보호 */
     svg, [data-baseweb="icon"], .material-icons {
         font-family: inherit !important;
     }
 
-    /* 기존 뱃지 및 컨텐츠 테이블 디자인 요소 */
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
@@ -43,71 +43,18 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* =========================================================
-       ✨ [새로운 모바일 앱 스타일 사이드바 CSS] ✨
-       ========================================================= */
-    /* 1. 사이드바 전체 배경색 (어두운 톤) */
-    [data-testid="stSidebar"] {
-        background-color: #261633 !important;
-    }
-
-    /* 2. 사이드바 내부 좌우 여백 조정 */
-    [data-testid="stSidebarUserContent"] {
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        padding-top: 3rem !important;
-    }
-
-    /* 3. 라디오 버튼(메뉴) 그룹 사이의 빈틈(여백) 줄임 */
-    [data-testid="stSidebar"] [data-testid="stRadio"] > div {
-        gap: 10px !important; 
-        margin-top: 1rem;
-    }
-
-    /* 4. 개별 메뉴를 거대한 라운드 블록 형태로 변형 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"] {
-        width: 100%;
-        height: 75px; /* 블록 높이 */
-        margin: 0;
-        padding: 0 20px;
-        cursor: pointer;
-        border-radius: 12px; /* 모서리 둥글게 */
-        display: flex;
-        justify-content: flex-start; /* 글자 왼쪽 정렬 기반 */
-        align-items: center;
-        transition: all 0.2s ease;
-    }
-
-    /* 5. 동그란 라디오 버튼(서클) 색상 흰색으로 변경하여 예쁘게 남김 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div {
-        background-color: transparent !important;
-        border-color: rgba(255,255,255,0.6) !important;
-    }
-
-    /* 6. 텍스트 정렬 및 폰트 굵기/크기 조정 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) {
-        width: 100%;
-        padding-left: 15px;
-    }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] p {
-        font-size: 1.35rem !important;
-        font-weight: 900 !important;
-        color: #ffffff !important; /* 글자는 무조건 흰색 */
-        padding: 0 !important;
-        margin: 0 !important;
-        letter-spacing: 0.5px;
-    }
-
-    /* 7. 메뉴 순서별로 모바일 이미지와 똑같은 배경 컬러 매칭 */
+    /* 사이드바 UI 커스텀 */
+    [data-testid="stSidebar"] { background-color: #261633 !important; }
+    [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] { width: 100%; height: 75px; margin: 0; padding: 0 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) { width: 100%; padding-left: 15px; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; }
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; }
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #e68128; }
-
-    /* 8. 마우스를 올렸거나 현재 탭이 선택되었을 때 강조 효과 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { 
-        transform: scale(1.02);
-        filter: brightness(1.1); 
-    }
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -140,12 +87,11 @@ def get_date_label(task_dict):
     return ""
 
 # ==============================================================
-# ✨ [데이터베이스 연결 로직 (Firebase 연동 - 오류 방지 강화판!)] ✨
+# ✨ [데이터베이스 연결 로직 (Firebase 연동 보강판!)] ✨
 # ==============================================================
 today_str = datetime.now().strftime("%Y-%m-%d")
 
 # 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
-# (예시: "https://youth-canvas-default-rtdb.firebaseio.com/data.json")
 FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
 
 def load_data():
@@ -153,14 +99,13 @@ def load_data():
         response = requests.get(FIREBASE_URL)
         if response.status_code == 200:
             data = response.json()
-            if data is not None:
+            # 데이터가 비정상적으로 지워졌을 때를 대비한 안전망 추가
+            if data and isinstance(data, dict) and 'programs' in data:
                 return data
-        else:
-            st.error(f"🚨 파이어베이스 접근 거부 (에러코드: {response.status_code}) - 파이어베이스 콘솔의 [규칙] 탭에서 읽기/쓰기가 true로 되어 있는지 확인해주세요.")
     except Exception as e:
-        st.error(f"🚨 파이어베이스 인터넷 연결 오류가 발생했습니다: {e}")
+        st.error(f"🚨 파이어베이스 인터넷 연결 오류: {e}")
 
-    # 연결에 실패했거나 완전 빈 깡통일 때만 기본 뼈대 제공 (임시 메모리 모드 작동)
+    # 데이터가 꼬이거나 없을 때 기본 뼈대
     return {
         "programs": [], "users": [], 
         "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}],
@@ -168,12 +113,17 @@ def load_data():
     }
 
 def save_data(data):
+    """클라우드 저장이 진짜로 성공했는지 True/False로 반환합니다."""
     try:
         res = requests.put(FIREBASE_URL, json=data)
-        if res.status_code != 200:
-            st.error(f"🚨 데이터 클라우드 저장 실패! (에러코드: {res.status_code}) - 파이어베이스 [규칙] 탭을 확인하세요.")
+        if res.status_code == 200:
+            return True
+        else:
+            st.error(f"🚨 클라우드 저장 실패! (에러코드: {res.status_code})")
+            return False
     except Exception as e:
         st.error("🚨 인터넷 문제로 데이터가 클라우드에 저장되지 않았습니다.")
+        return False
 # ==============================================================
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
@@ -199,6 +149,16 @@ with st.sidebar:
         index=["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"].index(st.session_state.menu_option),
         label_visibility="collapsed"
     )
+    
+    # ✨ 다중 창 테스트 시 덮어쓰기 방지를 위한 "동기화 버튼" 추가
+    st.write("")
+    st.write("")
+    if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
+        st.session_state['db'] = load_data()
+        st.toast("✅ 클라우드에서 최신 데이터를 성공적으로 불러왔습니다!")
+        time.sleep(1)
+        st.rerun()
+        
 st.session_state.menu_option = menu
 
 # =========================================================
@@ -324,7 +284,6 @@ elif st.session_state.menu_option == "나의 이야기":
                         curr = sum(1 for u in db['users'] if u['program'] == selected_prog_title and u['role'] == r)
                         role_options.append(f"{r} ({curr}/{cap}명) - {'지원가능' if curr < cap else '마감'}")
                     
-                    # ✨ [수정됨] 다중 선택(multiselect)으로 변경!
                     selected_role_strs = st.multiselect("희망 역할 (여러 개 동시 선택 가능)", role_options)
                     
                     st.write("")
@@ -338,7 +297,8 @@ elif st.session_state.menu_option == "나의 이야기":
                             if has_full_role: 
                                 st.error("선택한 역할 중 '정원이 마감된 역할'이 포함되어 있습니다. 마감된 역할은 빼고 다시 선택해주세요.")
                             else:
-                                # ✨ 여러 역할을 선택한 만큼 반복해서 각각 독립된 데이터로 저장
+                                # 가입 처리
+                                added_count = 0
                                 for r_str in selected_role_strs:
                                     actual_role = r_str.split(" (")[0]
                                     my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
@@ -352,9 +312,16 @@ elif st.session_state.menu_option == "나의 이야기":
                                         "alias": "", 
                                         "attendance": {}
                                     })
-                                save_data(db)
-                                st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요.")
-                                st.rerun()
+                                    added_count += 1
+                                
+                                # 성공적으로 저장되었는지 검증
+                                if save_data(db):
+                                    st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요.")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    # 저장 실패 시 임시로 추가했던 데이터를 원래대로 되돌림
+                                    for _ in range(added_count): db['users'].pop()
 
     with tab2:
         with st.container(border=True):
@@ -368,7 +335,6 @@ elif st.session_state.menu_option == "나의 이야기":
             if login_attempt or (search_name and search_pin):
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
                 if my_data:
-                    # 다중 역할을 가진 학생은 로그인 시 역할 수만큼 진도표가 아래로 쭉 나열됨!
                     for u_idx, data in enumerate(my_data):
                         st.divider()
                         st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님")
@@ -414,7 +380,8 @@ elif st.session_state.menu_option == "나의 이야기":
                                         if sub_done != stask.get('done'):
                                             stask['done'] = sub_done; changed = True
                                             
-                            if changed: save_data(db); st.rerun()
+                            if changed: 
+                                if save_data(db): st.rerun()
                         
                         st.write("#### 💬 관리자 1:1 소통 게시판")
                         chat_box = st.container(border=True, height=250)
@@ -428,7 +395,7 @@ elif st.session_state.menu_option == "나의 이야기":
                             msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
                             if c2.form_submit_button("전송") and msg_input:
                                 data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
-                                save_data(db); st.rerun()
+                                if save_data(db): st.rerun()
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
@@ -619,7 +586,10 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 for idx, att_data in att_updates.items():
                                     if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
                                     db['users'][idx]['attendance'][att_date_str] = att_data
-                                save_data(db); st.success(f"{att_date_str} 출석 정보가 성공적으로 저장되었습니다!"); st.rerun()
+                                if save_data(db):
+                                    st.success(f"{att_date_str} 출석 정보가 성공적으로 저장되었습니다!")
+                                    time.sleep(1)
+                                    st.rerun()
 
         with tab_manage_users:
             if not my_programs: st.info("담당 중인 프로그램이 없습니다.")
@@ -655,7 +625,10 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             new_alias = c1.text_input("변경할 이름 입력", value=current_disp, label_visibility="collapsed")
                             if c2.button("이름 저장", type="primary", use_container_width=True):
                                 db['users'][target_idx]['alias'] = new_alias
-                                save_data(db); st.success("관리자 목록의 표시 이름이 변경되었습니다!"); st.rerun()
+                                if save_data(db):
+                                    st.success("관리자 목록의 표시 이름이 변경되었습니다!")
+                                    time.sleep(1)
+                                    st.rerun()
                                 
                         st.write("") 
                         col_info, col_chat = st.columns([1, 1])
@@ -687,11 +660,13 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                             if sub_done != stask.get('done'):
                                                 stask['done'] = sub_done; changed_admin = True
                                                 
-                                if changed_admin: save_data(db); st.success("진도 저장됨"); st.rerun()
+                                if changed_admin: 
+                                    if save_data(db): st.success("진도 저장됨"); st.rerun()
                                 
                                 st.write("")
                                 if st.button("❌ 이 학생의 신청 취소 (데이터 삭제)", use_container_width=True):
-                                    db['users'].pop(target_idx); save_data(db); st.rerun()
+                                    db['users'].pop(target_idx)
+                                    if save_data(db): st.rerun()
 
                         with col_chat:
                             with st.container(border=True):
@@ -706,8 +681,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                     reply_input = c1.text_input("답장", label_visibility="collapsed")
                                     if c2.form_submit_button("전송") and reply_input:
                                         target_user.setdefault('messages', []).append({"sender": "admin", "content": reply_input})
-                                        save_data(db); st.rerun()
+                                        if save_data(db): st.rerun()
 
+        # ✨ 신규 프로그램 개설 검증 로직 추가
         with tab_create:
             with st.container(border=True):
                 with st.form("create_form"):
@@ -758,7 +734,14 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             admin_in_db = next(a for a in db['admins'] if a['name'] == admin_info['name'])
                             admin_in_db.setdefault('programs', []).append(t)
                             st.session_state['logged_admin']['programs'].append(t)
-                        save_data(db); st.success("개설 완료!"); st.rerun()
+                        
+                        # 검증 후 저장 로직
+                        if save_data(db):
+                            st.success("✨ 클라우드 서버에 프로그램이 안전하게 개설되었습니다!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            db['programs'].pop() # 실패시 롤백
 
         with tab_edit:
             if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
@@ -846,13 +829,21 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                                                 new_st_dict['done'] = old_st_dict.get('done', False)
                                         u['workflow'] = new_user_workflow
                             
+                            # 기존 데이터를 보존하면서 수정본으로 교체
+                            temp_prog = db['programs'][p_idx]
                             db['programs'][p_idx] = {
                                 "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
                                 "recruit_start": new_r_start.strftime("%Y-%m-%d"),
                                 "recruit_end": new_r_end.strftime("%Y-%m-%d"),
                                 "roles_capacity": parsed_c, "roles_workflow": parsed_w
                             }
-                            save_data(db); st.success("수정 완료 및 학생 데이터 동기화 성공! 보안을 위해 다시 로그인해주세요."); st.session_state['admin_logged_in'] = False; st.rerun()
+                            if save_data(db):
+                                st.success("수정 완료! 보안을 위해 잠시 후 로그아웃됩니다.")
+                                time.sleep(1.5)
+                                st.session_state['admin_logged_in'] = False
+                                st.rerun()
+                            else:
+                                db['programs'][p_idx] = temp_prog # 롤백
 
         with tab_settings:
             with st.container(border=True):
@@ -862,9 +853,12 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if st.form_submit_button("변경하기"):
                         if len(new_pin) == 4 and new_pin.isdigit():
                             admin_in_db = next(a for a in db['admins'] if a['name'] == admin_info['name'])
+                            old_pin = admin_in_db['pin']
                             admin_in_db['pin'] = new_pin
-                            save_data(db)
-                            st.success("변경 성공! 다시 로그인해주세요."); st.session_state['admin_logged_in'] = False; st.rerun()
+                            if save_data(db):
+                                st.success("변경 성공! 다시 로그인해주세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
+                            else:
+                                admin_in_db['pin'] = old_pin
                         else: st.error("4자리 숫자로 입력해주세요.")
             
             if is_super:
@@ -882,7 +876,10 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
                             else:
                                 db['admins'].append({"name": new_adm_name, "pin": new_adm_pin, "role": "normal", "programs": assign_progs})
-                                save_data(db); st.success(f"[{new_adm_name}] 선생님 계정이 생성되었습니다!"); st.rerun()
+                                if save_data(db):
+                                    st.success(f"[{new_adm_name}] 선생님 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
+                                else:
+                                    db['admins'].pop()
                     
                     st.write("#### 📋 등록된 선생님(관리자) 목록")
                     df_admins = pd.DataFrame([{"이름": a['name'], "권한": "최고관리자" if a['role'] == "super" else "담당 지도사", "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
@@ -895,10 +892,11 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         col_del1, col_del2 = st.columns([8, 2])
                         admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed")
                         if col_del2.button("❌ 계정 삭제", type="primary", use_container_width=True):
+                            temp_admins = copy.deepcopy(db['admins'])
                             db['admins'] = [a for a in db['admins'] if a['name'] != admin_to_delete]
-                            save_data(db)
-                            st.success(f"[{admin_to_delete}] 계정이 성공적으로 삭제되었습니다.")
-                            st.rerun()
+                            if save_data(db):
+                                st.success(f"[{admin_to_delete}] 계정이 성공적으로 삭제되었습니다."); time.sleep(1); st.rerun()
+                            else:
+                                db['admins'] = temp_admins
                     else:
                         st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
-
