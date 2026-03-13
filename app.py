@@ -169,7 +169,7 @@ st.session_state.menu_option = menu
 # [페이지 1] 메인 대시보드
 # =========================================================
 if st.session_state.menu_option == "찾아보기 (탐색)":
-    st.markdown("## ✨ 지금 뜨고 있는 청소년 활동")
+    st.markdown("## ✨ 지금 할 수 있는 청소년 활동")
     st.write("") 
     
     if not db['programs']: st.info("아직 개설된 프로그램이 없습니다. 관리자 페이지에서 프로그램을 만들어주세요.")
@@ -903,3 +903,4 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 db['admins'] = temp_admins
                     else:
                         st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
+
