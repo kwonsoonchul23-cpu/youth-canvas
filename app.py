@@ -221,7 +221,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2] 청소년/학부모 페이지 
+# [페이지 2] 청소년/학부모 페이지
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 및 성장 리포트")
@@ -468,7 +468,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 st.download_button("📥 결과 엑셀(CSV) 다운로드", data=csv_data, file_name="명단.csv", mime="text/csv", type="primary")
             else: st.info("데이터가 없습니다.")
 
-        # ✨ [리뉴얼 완료] 날짜 잠금(스마트 달력) 적용 및 시각화 대시보드
+        # ✨ [기능 추가 완료] 출석 탭에 3번째 '개별 기록 수정/삭제' 탭 생성
         with tab_attendance:
             st.subheader("✅ 프로그램별 출석 관리")
             if my_programs:
@@ -478,10 +478,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 if not pu:
                     st.warning("해당 프로그램에 신청한 학생이 없습니다.")
                 else:
-                    att_sub1, att_sub2 = st.tabs(["📅 일일 출석 입력", "📊 전체 출석 현황 & 시각화"])
+                    att_sub1, att_sub2, att_sub3 = st.tabs(["📅 일일 출석 입력", "📊 전체 출석 현황 & 시각화", "✏️ 개별 기록 수정/삭제"])
                     
                     with att_sub1:
-                        # 1. 선택된 프로그램의 날짜 범위(min, max) 추출 로직
                         p_data = next((p for p in db['programs'] if p['title'] == att_prog), None)
                         all_dates = []
                         if p_data:
@@ -493,13 +492,11 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                             try: all_dates.append(datetime.strptime(d_str, "%Y-%m-%d").date())
                                             except: pass
                         
-                        # 2. 날짜 선택기(Date Input)에 안전장치 적용
                         date_kwargs = {}
                         if all_dates:
                             min_d, max_d = min(all_dates), max(all_dates)
                             date_kwargs['min_value'] = min_d
                             date_kwargs['max_value'] = max_d
-                            # 오늘이 프로그램 기간 안에 있으면 오늘을, 아니면 기간 내 날짜를 기본값으로
                             def_d = date.today()
                             if def_d < min_d: def_d = min_d
                             elif def_d > max_d: def_d = max_d
@@ -551,7 +548,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         
                         if att_records:
                             df_att = pd.DataFrame(att_records)
-                            
                             st.write("##### 📅 학생별 일자별 출석 상세")
                             pivot_df = df_att.pivot(index='학생명', columns='날짜', values='상태').fillna('-')
                             pivot_df = pivot_df.reindex(sorted(pivot_df.columns), axis=1) 
@@ -575,6 +571,49 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             st.info("💡 **원장님 인사이트:** 빨간색(결석)이나 노란색(지각) 누적 비율이 높은 학생을 한눈에 식별하고 빠르게 학부모 면담을 진행할 수 있습니다.")
                         else:
                             st.info("아직 기록된 출석 데이터가 없습니다. [일일 출석 입력] 탭에서 먼저 출석을 기록해 주세요.")
+                            
+                    # ✨ 새롭게 추가된 3번째 서브탭: 개별 기록 수정/삭제 기능
+                    with att_sub3:
+                        st.markdown("#### ✏️ 개별 학생 출석 기록 수정 및 삭제")
+                        st.info("특정 학생의 잘못 입력된 과거 출석 기록을 개별적으로 수정하거나 아예 지울 수 있습니다.")
+                        
+                        att_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
+                        selected_user_label = st.selectbox("🎓 수정할 학생 선택", list(att_user_options.keys()), key="att_edit_user")
+                        target_idx = att_user_options[selected_user_label]
+                        target_user = db['users'][target_idx]
+                        
+                        att_history = target_user.get('attendance', {})
+                        if not att_history:
+                            st.warning("이 학생은 아직 기록된 출석 데이터가 없습니다.")
+                        else:
+                            sorted_dates = sorted(list(att_history.keys()), reverse=True)
+                            selected_date = st.selectbox("🗓️ 수정/삭제할 날짜 선택", sorted_dates, key="att_edit_date")
+                            
+                            curr_record = att_history[selected_date]
+                            
+                            with st.form(f"att_edit_form_{target_idx}_{selected_date}"):
+                                c1, c2 = st.columns(2)
+                                new_status = c1.selectbox("상태", ["출석", "지각", "결석", "병결"], index=["출석", "지각", "결석", "병결"].index(curr_record['status']))
+                                new_note = c2.text_input("비고", value=curr_record.get('note', ''))
+                                
+                                st.write("")
+                                col_btn1, col_btn2 = st.columns(2)
+                                submit_edit = col_btn1.form_submit_button("💾 이 날짜 기록 수정", type="primary", use_container_width=True)
+                                submit_delete = col_btn2.form_submit_button("🗑️ 이 날짜 기록 완전히 삭제", use_container_width=True)
+                                
+                                if submit_edit:
+                                    db['users'][target_idx]['attendance'][selected_date] = {"status": new_status, "note": new_note}
+                                    if save_data(db):
+                                        st.success(f"{selected_date} 기록이 성공적으로 수정되었습니다!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                        
+                                if submit_delete:
+                                    del db['users'][target_idx]['attendance'][selected_date]
+                                    if save_data(db):
+                                        st.success(f"{selected_date} 기록이 완전히 삭제되었습니다!")
+                                        time.sleep(1)
+                                        st.rerun()
 
         with tab_manage_users:
             if my_programs:
