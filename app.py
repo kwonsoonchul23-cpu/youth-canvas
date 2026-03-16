@@ -6,6 +6,7 @@ import re
 import calendar
 import copy
 import time
+import urllib.request
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
@@ -13,19 +14,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns 
 import matplotlib.font_manager as fm
 
-# --- [시각화 폰트 설정 (한글 깨짐 방지)] ---
-import platform
-if platform.system() == 'Darwin': 
-    plt.rc('font', family='AppleGothic')
-elif platform.system() == 'Windows': 
-    plt.rc('font', family='Malgun Gothic')
-else: 
-    pass
-plt.rcParams['axes.unicode_minus'] = False
-sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
-
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
+
+# --- ✨ [핵심 수정] 시각화 폰트 설정 (Streamlit 클라우드 한글 깨짐 100% 방어) ---
+@st.cache_resource
+def set_korean_font():
+    font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+    font_path = "NanumGothic.ttf"
+    try:
+        # 클라우드에 폰트가 없으면 구글에서 즉시 다운로드
+        if not os.path.exists(font_path):
+            urllib.request.urlretrieve(font_url, font_path)
+        fm.fontManager.addfont(font_path)
+        font_prop = fm.FontProperties(fname=font_path)
+        font_name = font_prop.get_name()
+        plt.rc('font', family=font_name)
+        plt.rcParams['axes.unicode_minus'] = False
+        sns.set_theme(style='whitegrid', font=font_name, font_scale=1.0)
+    except:
+        # 혹시 모를 로컬 에러 대비용
+        import platform
+        if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
+        elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
+        plt.rcParams['axes.unicode_minus'] = False
+
+set_korean_font()
 
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
@@ -207,7 +221,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2] 청소년/학부모 페이지
+# [페이지 2] 청소년/학부모 페이지 
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 및 성장 리포트")
@@ -454,7 +468,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 st.download_button("📥 결과 엑셀(CSV) 다운로드", data=csv_data, file_name="명단.csv", mime="text/csv", type="primary")
             else: st.info("데이터가 없습니다.")
 
-        # ✨ [리뉴얼 완료] 출석 관리 탭 (일일 입력 + 대시보드 시각화 분리)
+        # ✨ [리뉴얼 완료] 날짜 잠금(스마트 달력) 적용 및 시각화 대시보드
         with tab_attendance:
             st.subheader("✅ 프로그램별 출석 관리")
             if my_programs:
@@ -467,7 +481,34 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     att_sub1, att_sub2 = st.tabs(["📅 일일 출석 입력", "📊 전체 출석 현황 & 시각화"])
                     
                     with att_sub1:
-                        att_date = st.date_input("🗓️ 출석을 기록할 날짜 선택").strftime("%Y-%m-%d")
+                        # 1. 선택된 프로그램의 날짜 범위(min, max) 추출 로직
+                        p_data = next((p for p in db['programs'] if p['title'] == att_prog), None)
+                        all_dates = []
+                        if p_data:
+                            for role, tasks in p_data.get('roles_workflow', {}).items():
+                                for t in tasks:
+                                    sd, ed = get_date_range(t)
+                                    for d_str in [sd, ed]:
+                                        if d_str and re.match(r'\d{4}-\d{2}-\d{2}', d_str):
+                                            try: all_dates.append(datetime.strptime(d_str, "%Y-%m-%d").date())
+                                            except: pass
+                        
+                        # 2. 날짜 선택기(Date Input)에 안전장치 적용
+                        date_kwargs = {}
+                        if all_dates:
+                            min_d, max_d = min(all_dates), max(all_dates)
+                            date_kwargs['min_value'] = min_d
+                            date_kwargs['max_value'] = max_d
+                            # 오늘이 프로그램 기간 안에 있으면 오늘을, 아니면 기간 내 날짜를 기본값으로
+                            def_d = date.today()
+                            if def_d < min_d: def_d = min_d
+                            elif def_d > max_d: def_d = max_d
+                            date_kwargs['value'] = def_d
+                        else:
+                            date_kwargs['value'] = date.today()
+
+                        att_date_obj = st.date_input("🗓️ 출석을 기록할 날짜 선택 (프로그램 기간만 선택 가능)", **date_kwargs)
+                        att_date = att_date_obj.strftime("%Y-%m-%d")
                         st.info(f"💡 선택하신 **{att_date}**의 출석을 입력합니다. 이미 기록된 내용이 있다면 아래에 표시됩니다.")
                         
                         with st.form(f"att_form"):
@@ -511,13 +552,11 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         if att_records:
                             df_att = pd.DataFrame(att_records)
                             
-                            # 1. 일자별 출석부 (피벗 테이블)
                             st.write("##### 📅 학생별 일자별 출석 상세")
                             pivot_df = df_att.pivot(index='학생명', columns='날짜', values='상태').fillna('-')
-                            pivot_df = pivot_df.reindex(sorted(pivot_df.columns), axis=1) # 날짜순 정렬
+                            pivot_df = pivot_df.reindex(sorted(pivot_df.columns), axis=1) 
                             st.dataframe(pivot_df, use_container_width=True)
                             
-                            # 2. 상태별 집계 및 시각화 (누적 막대 차트)
                             st.write("##### 📊 학생별 누적 현황 시각화")
                             agg_df = df_att.groupby(['학생명', '상태']).size().unstack(fill_value=0)
                             for col in ['출석', '지각', '결석', '병결']:
