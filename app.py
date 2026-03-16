@@ -65,7 +65,7 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* 사이드바 UI 커스텀 */
+    /* 사이드바 UI 커스텀 (메뉴 4개 컬러 배분) */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
@@ -73,9 +73,10 @@ st.markdown("""
     [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
     [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) { width: 100%; padding-left: 15px; }
     [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #e68128; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } /* 찾아보기 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } /* 나의 이야기 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } /* 학부모 공간 (신규) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } /* 관계자 외 */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
     </style>
 """, unsafe_allow_html=True)
@@ -117,9 +118,12 @@ def load_data():
         response = requests.get(FIREBASE_URL)
         if response.status_code == 200:
             data = response.json()
-            if data and isinstance(data, dict) and 'programs' in data: return data
+            if data and isinstance(data, dict) and 'programs' in data: 
+                # 학부모 데이터베이스 뼈대 추가 보장
+                if 'parents' not in data: data['parents'] = []
+                return data
     except Exception as e: st.error(f"🚨 연결 오류: {e}")
-    return {"programs": [], "users": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}}
+    return {"programs": [], "users": [], "parents": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}}
 
 def save_data(data):
     try:
@@ -131,13 +135,15 @@ def save_data(data):
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
+if 'parents' not in db: db['parents'] = [] # 안정성 보장
 
 if 'menu_option' not in st.session_state: st.session_state.menu_option = "찾아보기 (탐색)"
 def change_page(page_name): st.session_state.menu_option = page_name; st.rerun()
 
 with st.sidebar:
     st.markdown("<div style='margin-bottom: 2rem; padding: 0 10px;'><div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div><div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div></div>", unsafe_allow_html=True)
-    menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
+    # ✨ 학부모 공간 메뉴 추가
+    menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", "👨‍👩‍👧 학부모 공간", "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", "👨‍👩‍👧 학부모 공간", "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
     st.write(""); st.write("")
     if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
         st.session_state['db'] = load_data(); st.toast("✅ 동기화 완료!"); time.sleep(1); st.rerun()
@@ -219,11 +225,11 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2] 청소년/학부모 페이지
+# [페이지 2-1] 청소년 전용 페이지 (순수 학생용으로 분리)
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
-    st.markdown("## 🙋 나의 활동 및 성장 리포트")
-    tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 종합 리포트 및 진행도 (로그인)"])
+    st.markdown("## 🙋 나의 활동 진행도")
+    tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 나의 목표 및 진행도 (로그인)"])
     
     with tab1:
         prog_titles = [p['title'] for p in db['programs']]
@@ -274,38 +280,19 @@ elif st.session_state.menu_option == "나의 이야기":
                 if my_data:
                     for u_idx, data in enumerate(my_data):
                         st.divider()
-                        st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님 <span style='font-size:0.6em; color:gray;'>(학부모 열람용)</span>", unsafe_allow_html=True)
+                        st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님", unsafe_allow_html=True)
                         st.markdown(f"<span class='badge-blue'>담당 역할: {data['role']}</span>", unsafe_allow_html=True)
                         st.write("")
                         
-                        st.markdown("#### 📈 우리 아이 성장 리포트")
                         tasks = data['workflow']
-                        task_names = [t['task'] for t in tasks]
-                        task_scores = [t.get('score', 0) for t in tasks]
-                        avg_score = sum(task_scores) / len(task_scores) if task_scores else 0
-                        
                         total_items = 0; done_items = 0
                         for t in tasks:
                             total_items += 1; done_items += 1 if t.get('done') else 0
                             for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                         pct = int((done_items/total_items)*100) if total_items > 0 else 0
                         
-                        colR1, colR2 = st.columns(2)
-                        colR1.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
-                        colR2.metric("선생님 종합 성취도 평가", f"{int(avg_score)}점", "100점 만점 기준")
-                        
-                        if task_scores:
-                            df_scores = pd.DataFrame({"성취도 점수": task_scores}, index=task_names)
-                            st.line_chart(df_scores, color="#e68128", height=200)
-
-                        st.markdown("#### 💌 선생님의 따뜻한 알림장")
-                        has_comments = False
-                        for t in tasks:
-                            if t.get('comment'):
-                                st.info(f"**[{t['task']}]** {t['comment']}")
-                                has_comments = True
-                        if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
-                        st.write("---")
+                        st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                        st.progress(pct / 100)
 
                         st.write("#### ✅ 세부 활동 체크리스트")
                         with st.container(border=True):
@@ -321,7 +308,7 @@ elif st.session_state.menu_option == "나의 이야기":
                             if changed: 
                                 if save_data(db): st.rerun()
 
-                        st.write("#### 💬 1:1 비밀 소통 게시판")
+                        st.write("#### 💬 선생님과 1:1 비밀 소통 게시판")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
                             if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -334,6 +321,113 @@ elif st.session_state.menu_option == "나의 이야기":
                                 data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
                                 if save_data(db): st.rerun()
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
+
+# =========================================================
+# ✨ [페이지 2-2] 학부모 전용 라운지 신설!
+# =========================================================
+elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
+    st.markdown("## 👨‍👩‍👧 학부모 전용 라운지")
+    st.caption("발급받으신 개별 학부모 계정으로 로그인하여 자녀의 성장 기록과 커리큘럼을 확인하세요.")
+    
+    with st.container(border=True):
+        col_id, col_pw, col_btn = st.columns([4, 4, 2])
+        parent_name = col_id.text_input("학부모 성함", placeholder="예: 권해리 어머니")
+        parent_pin = col_pw.text_input("학부모 전용 비밀번호 (4자리)", type="password")
+        login_attempt = col_btn.button("로그인", use_container_width=True)
+        
+        if login_attempt or (parent_name and parent_pin):
+            my_parent_data = [p for p in db['parents'] if p['name'] == parent_name and p['pin'] == parent_pin]
+            
+            if my_parent_data:
+                p_info = my_parent_data[0]
+                st.success(f"환영합니다, **{p_info['name']}**님! 😊")
+                linked_students = p_info.get('linked_students', [])
+                
+                if not linked_students:
+                    st.info("아직 연결된 자녀(학생) 정보가 없습니다. 기관(학원)에 문의해주세요.")
+                else:
+                    # ✨ 다둥이(여러 자녀) 지원 탭
+                    child_tabs = st.tabs([f"👦👧 {s['name']} ({s['program']})" for s in linked_students])
+                    
+                    for idx, s_info in enumerate(linked_students):
+                        with child_tabs[idx]:
+                            # 해당 자녀의 실제 데이터 검색
+                            s_record = next((u for u in db['users'] if u['name'] == s_info['name'] and u['program'] == s_info['program']), None)
+                            
+                            if s_record:
+                                st.markdown(f"### 🏅 [{s_record['program']}] 참가자 **{s_record['name']}**님")
+                                st.markdown(f"<span class='badge-blue'>담당 역할: {s_record['role']}</span>", unsafe_allow_html=True)
+                                
+                                # 1. 프로그램 전체 커리큘럼 (학부모용 열람 기능)
+                                prog_data = next((p for p in db['programs'] if p['title'] == s_record['program']), None)
+                                if prog_data:
+                                    with st.expander("📚 [열람] 학원 프로그램 전체 커리큘럼 보기"):
+                                        st.write(f"**프로그램 소개:** {prog_data['desc']}")
+                                        st.divider()
+                                        st.write(f"**자녀 담당 역할 ({s_record['role']}) 상세 일정:**")
+                                        for t in prog_data.get('roles_workflow', {}).get(s_record['role'], []):
+                                            st.write(f"🔹 **{get_date_label(t)}{t['task']}**")
+                                            for stask in t.get('subtasks', []):
+                                                st.write(f"  &nbsp;&nbsp;&nbsp;└ {stask['desc']}")
+                                
+                                # 2. 우리 아이 종합 리포트
+                                st.markdown("#### 📈 우리 아이 성장 리포트")
+                                tasks = s_record['workflow']
+                                task_names = [t['task'] for t in tasks]
+                                task_scores = [t.get('score', 0) for t in tasks]
+                                avg_score = sum(task_scores) / len(task_scores) if task_scores else 0
+                                
+                                total_items = 0; done_items = 0
+                                for t in tasks:
+                                    total_items += 1; done_items += 1 if t.get('done') else 0
+                                    for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
+                                pct = int((done_items/total_items)*100) if total_items > 0 else 0
+                                
+                                colR1, colR2 = st.columns(2)
+                                colR1.metric("세부 목표 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                                colR2.metric("선생님 종합 성취도 평가", f"{int(avg_score)}점", "100점 만점 기준")
+                                
+                                if task_scores:
+                                    df_scores = pd.DataFrame({"성취도 점수": task_scores}, index=task_names)
+                                    st.line_chart(df_scores, color="#e68128", height=200)
+
+                                st.markdown("#### 💌 선생님의 따뜻한 알림장")
+                                has_comments = False
+                                for t in tasks:
+                                    if t.get('comment'):
+                                        st.info(f"**[{t['task']}]** {t['comment']}")
+                                        has_comments = True
+                                if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
+                                st.write("---")
+
+                                # 3. 세부 활동 체크리스트 (읽기 전용 모드)
+                                st.write("#### ✅ 세부 활동 체크리스트 (열람 전용)")
+                                with st.container(border=True):
+                                    for t_idx, t in enumerate(tasks):
+                                        st.checkbox(f"**{get_date_label(t)}{t['task']}**", value=t.get('done'), key=f"p_chk_{s_record['name']}_{u_idx}_{t_idx}", disabled=True)
+                                        for s_idx, stask in enumerate(t.get('subtasks', [])):
+                                            col_empty, col_chk = st.columns([1, 20])
+                                            with col_chk:
+                                                st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"p_chk_sub_{s_record['name']}_{u_idx}_{t_idx}_{s_idx}", disabled=True)
+                                
+                                # 4. 학부모-선생님 1:1 메시지
+                                st.write("#### 💬 선생님께 메시지 보내기")
+                                chat_box = st.container(border=True, height=250)
+                                with chat_box:
+                                    if not s_record.get('messages'): st.info("아직 나눈 대화가 없습니다.")
+                                    for msg in s_record.get('messages', []):
+                                        with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
+                                with st.form(f"p_chat_form_{s_record['name']}_{u_idx}", clear_on_submit=True):
+                                    c1, c2 = st.columns([8, 2])
+                                    msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
+                                    if c2.form_submit_button("전송") and msg_input:
+                                        # ✨ 부모님 이름이 태그되어 선생님이 누군지 알 수 있게 전송
+                                        s_record.setdefault('messages', []).append({"sender": "user", "content": f"[{p_info['name']}] {msg_input}"})
+                                        if save_data(db): st.rerun()
+                            else:
+                                st.error(f"[{s_info['name']}] 학생의 데이터를 찾을 수 없습니다. 프로그램이 종료되었거나 이름이 변경되었을 수 있습니다.")
+            else:
+                st.error("이름과 비밀번호가 일치하지 않습니다.")
 
 # =========================================================
 # [페이지 3] 관리자 페이지
@@ -360,17 +454,19 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
         if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
-        tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "⚙️ 정보 수정", "🔐 계정 관리"]
+        # ✨ 새로운 '학부모 계정' 탭 동적 추가
         if is_super:
-            tab_titles.insert(5, "📝 신규 개설")
-        
-        tabs = st.tabs(tab_titles)
-        tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users = tabs[:5]
-        
-        if is_super:
-            tab_create, tab_edit, tab_settings = tabs[5:]
+            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "👨‍👩‍👧 학부모 계정", "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"]
         else:
-            tab_edit, tab_settings = tabs[5:]
+            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "👨‍👩‍👧 학부모 계정", "⚙️ 정보 수정", "🔐 계정 관리"]
+
+        tabs = st.tabs(tab_titles)
+        tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents = tabs[:6]
+        
+        if is_super:
+            tab_create, tab_edit, tab_settings = tabs[6:]
+        else:
+            tab_edit, tab_settings = tabs[6:]
         
         with tab_dashboard:
             dashboard_title = "학원장 전용" if is_super else f"{admin_info['name']} 선생님 전용"
@@ -401,10 +497,8 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                # ✨ [신규 기능] 그래프 자동 해석 리포트 (긍정/부정)
                 st.markdown("#### 💡 AI 데이터 분석 해석 리포트")
                 if not df_dash.empty:
-                    # 1. 긍정적 요인 계산
                     top_prog = df_dash.groupby('Program')['AvgScore'].mean().idxmax()
                     top_score = df_dash.groupby('Program')['AvgScore'].mean().max()
                     
@@ -416,7 +510,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         pos_text += f"- **피드백 효과:** 선생님의 코멘트 수와 학생 성취도 간에 긍정적인 상관관계(계수: {corr:.2f})가 확인되었습니다. 선생님의 관심이 성적 향상으로 직결되고 있습니다.\n"
                     st.success(pos_text)
                     
-                    # 2. 부정적(위험) 요인 계산
                     neg_text = f"**[주의 및 개선 필요 🔴]**\n"
                     low_students = df_dash[df_dash['AvgScore'] < 60]
                     if not low_students.empty:
@@ -433,7 +526,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     st.error(neg_text)
                     st.divider()
 
-                # 기존 시각화 그래프
                 st.markdown("##### 🔍 프로그램별 성과 및 이상치 탐지")
                 fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
@@ -446,6 +538,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax2.set_ylim(0, 100)
                 ax2.tick_params(axis='x', rotation=45)
                 st.pyplot(fig1)
+                st.info(f"💡 **{insight_caller} 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
 
                 st.markdown("##### 🔍 강사 관리 효율성 및 과업 난이도 분석")
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
@@ -458,8 +551,8 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
+                st.info(f"💡 **{insight_caller} 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
 
-        # ✨ [UI 개선] 평가 화면에서 '세부 내용' 명확히 표시
         with tab_eval:
             st.subheader("📝 학생 주차/과업별 달성도 및 코멘트 평가")
             if not my_programs: st.info("담당 프로그램이 없습니다.")
@@ -482,7 +575,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         for t_idx, t in enumerate(target_user['workflow']):
                             st.markdown(f"**[{t['task']}]** <span style='color:gray; font-size:0.85em;'>*(기간: {get_date_label(t).strip()})*</span>", unsafe_allow_html=True)
                             
-                            # 세부 내용(서브태스크) 표시하여 평가 시 참고하도록 함
                             if t.get('subtasks'):
                                 sub_texts = [f"↳ {stask['desc']} {'(✅완료)' if stask.get('done') else '(미완료)'}" for stask in t['subtasks']]
                                 st.caption("\n".join(sub_texts))
@@ -728,6 +820,61 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 if save_data(db): st.rerun()
                     if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
+
+        # ✨ [신규 기능] 학부모 계정 발급 및 연결 관리 탭
+        with tab_parents:
+            st.subheader("👨‍👩‍👧 학부모 계정 발급 및 학생 연결")
+            st.info("💡 학부모님 전용 계정을 만들고, 해당 계정으로 열람할 수 있는 자녀(학생)를 선택해 연결합니다. (어머니/아버지 개별 발급 가능)")
+            
+            if not my_programs:
+                st.warning("담당 중인 프로그램이 없어 학생을 연결할 수 없습니다.")
+            else:
+                with st.form("parent_create_form"):
+                    col1, col2 = st.columns(2)
+                    p_name = col1.text_input("학부모 이름 (예: 권해리 어머니)")
+                    p_pin = col2.text_input("학부모용 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
+                    
+                    # 현재 관리자가 볼 수 있는 모든 학생 목록
+                    all_students = [f"{u['name']} - {u['program']} ({u['role']})" for u in db['users'] if u['program'] in my_programs]
+                    linked_sts = st.multiselect("이 학부모 계정과 연결할 자녀(학생) 선택 (다둥이 다중 선택 가능)", all_students)
+                    
+                    if st.form_submit_button("학부모 계정 발급 및 연결", type="primary"):
+                        if p_name and len(p_pin) == 4 and p_pin.isdigit() and linked_sts:
+                            existing_p = next((p for p in db['parents'] if p['name'] == p_name and p['pin'] == p_pin), None)
+                            
+                            parsed_students = []
+                            for st_str in linked_sts:
+                                s_name = st_str.split(" - ")[0]
+                                s_prog = st_str.split(" - ")[1].split(" (")[0]
+                                parsed_students.append({"name": s_name, "program": s_prog})
+                                
+                            if existing_p:
+                                existing_p['linked_students'] = parsed_students
+                                st.success(f"[{p_name}] 학부모 계정의 연결 정보가 성공적으로 업데이트되었습니다!")
+                            else:
+                                db['parents'].append({"name": p_name, "pin": p_pin, "linked_students": parsed_students})
+                                st.success(f"[{p_name}] 학부모 계정이 신규 발급되었습니다!")
+                                
+                            if save_data(db):
+                                time.sleep(1)
+                                st.rerun()
+                        else:
+                            st.error("학부모 이름, 4자리 숫자 비밀번호, 연결할 자녀를 모두 올바르게 입력해주세요.")
+                            
+                if db.get('parents'):
+                    st.write("#### 📋 등록된 학부모 목록")
+                    parent_list = []
+                    for p in db['parents']:
+                        linked_str = ", ".join([f"{s['name']}({s['program']})" for s in p.get('linked_students', [])])
+                        parent_list.append({"학부모 이름": p['name'], "연결된 자녀 내역": linked_str})
+                    st.dataframe(pd.DataFrame(parent_list), hide_index=True, use_container_width=True)
+                    
+                    st.divider()
+                    st.write("#### 🗑️ 학부모 계정 영구 삭제")
+                    del_p = st.selectbox("삭제할 학부모 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed")
+                    if st.button("❌ 선택한 학부모 계정 삭제"):
+                        db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
+                        if save_data(db): st.rerun()
 
         if is_super:
             with tab_create:
