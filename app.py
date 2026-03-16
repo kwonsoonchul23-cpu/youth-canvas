@@ -66,7 +66,7 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* 사이드바 UI 커스텀 */
+    /* 사이드바 UI 커스텀 (메뉴 4개 컬러 배분) */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
@@ -252,7 +252,7 @@ if st.session_state.menu_option == UI['menu1']:
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu2'])
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지
+# [페이지 2-1] 청소년 전용 페이지 
 # =========================================================
 elif st.session_state.menu_option == UI['menu2']:
     st.markdown(f"## {UI['page2_title']}")
@@ -351,7 +351,6 @@ elif st.session_state.menu_option == UI['menu2']:
                     df_summ = pd.DataFrame(summary_rows)
                     st.dataframe(df_summ, use_container_width=True, hide_index=True)
                     
-                    # ✨ 학생용 차트 분리 패널 적용
                     if not df_summ.empty:
                         s_col1, s_col2 = st.columns(2)
                         with s_col1:
@@ -362,6 +361,12 @@ elif st.session_state.menu_option == UI['menu2']:
                                 ax_s1.set_ylim(0, 100)
                                 ax_s1.tick_params(axis='x', rotation=15)
                                 st.pyplot(fig_s1)
+                                
+                                if df_summ['진행률(%)'].max() == 0:
+                                    st.info("📉 진행된 목표가 없습니다.")
+                                else:
+                                    top_prog = df_summ.loc[df_summ['진행률(%)'].idxmax()]
+                                    st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_prog['프로그램']}' 달성률이 {top_prog['진행률(%)']}%로 가장 높습니다!</div></div>", unsafe_allow_html=True)
 
                         with s_col2:
                             with st.container(border=True):
@@ -371,6 +376,12 @@ elif st.session_state.menu_option == UI['menu2']:
                                 ax_s2.set_ylim(0, 100)
                                 ax_s2.tick_params(axis='x', rotation=15)
                                 st.pyplot(fig_s2)
+                                
+                                if df_summ['평균 성취도'].max() == 0:
+                                    st.info("📉 입력된 평가 점수가 없습니다.")
+                                else:
+                                    top_score_prog = df_summ.loc[df_summ['평균 성취도'].idxmax()]
+                                    st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_score_prog['프로그램']}' 성취도가 {top_score_prog['평균 성취도']:.1f}점으로 탁월합니다.</div></div>", unsafe_allow_html=True)
                         
                     st.markdown("#### 💡 나의 종합 분석 리포트")
                     overall_pct = int((total_d_all / total_t_all) * 100) if total_t_all > 0 else 0
@@ -448,7 +459,7 @@ elif st.session_state.menu_option == UI['menu2']:
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 2-2] 학부모 전용 라운지
+# [페이지 2-2] ✨ 학부모 전용 라운지 (다중 자녀/프로그램 통합 비교 지원)
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['menu3']}")
@@ -471,10 +482,130 @@ elif st.session_state.menu_option == UI['menu3']:
                 if not linked_students:
                     st.info(f"아직 연결된 정보가 없습니다. 기관에 문의해주세요.")
                 else:
-                    child_tabs = st.tabs([f"👦👧 {s['name']} ({s['program']})" for s in linked_students])
+                    # ==============================================================
+                    # ✨ [신규 기능] 자녀 종합 비교 대시보드 (다둥이 부모님용)
+                    # ==============================================================
+                    p_summary_rows = []
+                    att_counts_total = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}
                     
+                    for s_info in linked_students:
+                        s_record = next((u for u in db['users'] if u['name'] == s_info['name'] and u['program'] == s_info['program']), None)
+                        if s_record:
+                            tasks = s_record['workflow']
+                            t_items, d_items, s_list = 0, 0, []
+                            for t in tasks:
+                                t_items += 1
+                                d_items += 1 if t.get('done') else 0
+                                if t.get('score', 0) > 0: s_list.append(t.get('score'))
+                                for stask in t.get('subtasks', []):
+                                    t_items += 1
+                                    d_items += 1 if stask.get('done') else 0
+                                    
+                            pct = int((d_items/t_items)*100) if t_items > 0 else 0
+                            avg_s = sum(s_list)/len(s_list) if s_list else 0
+                            
+                            s_att = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}
+                            for att_info in s_record.get('attendance', {}).values():
+                                st_val = att_info.get('status')
+                                if st_val in s_att:
+                                    s_att[st_val] += 1
+                                    att_counts_total[st_val] += 1
+                                    
+                            p_summary_rows.append({
+                                "자녀명": s_record['name'],
+                                "프로그램": s_record['program'],
+                                "라벨": f"{s_record['name']}\n({s_record['program']})", 
+                                "진행률(%)": pct,
+                                "평균 성취도": avg_s,
+                                "결석_지각": s_att['결석'] + s_att['지각']
+                            })
+
+                    tab_names = ["🌟 자녀 종합 대시보드"] + [f"👦👧 {s['name']} ({s['program']})" for s in linked_students]
+                    parent_tabs = st.tabs(tab_names)
+                    
+                    # --------------------------------------------
+                    # 첫 번째 탭: 자녀 종합 분석 리포트
+                    # --------------------------------------------
+                    with parent_tabs[0]:
+                        if not p_summary_rows:
+                            st.warning("데이터를 불러올 수 있는 연결된 자녀가 없습니다.")
+                        else:
+                            st.markdown(f"### 🌟 **{p_info['name']}**님의 자녀 종합 대시보드")
+                            st.info("자녀들의 모든 프로그램 진행 상황을 한눈에 비교하고 분석해 보세요.")
+                            
+                            df_p_summ = pd.DataFrame(p_summary_rows)
+                            
+                            # 차트 표시 영역
+                            p_col1, p_col2 = st.columns(2)
+                            with p_col1:
+                                with st.container(border=True):
+                                    st.markdown(f"##### 📊 자녀별 프로그램 진행률")
+                                    fig_p1, ax_p1 = plt.subplots(figsize=(6, 4))
+                                    sns.barplot(data=df_p_summ, x='라벨', y='진행률(%)', ax=ax_p1, palette='mako')
+                                    ax_p1.set_ylim(0, 100)
+                                    st.pyplot(fig_p1)
+                                    
+                                    if df_p_summ['진행률(%)'].max() == 0:
+                                        st.info("📉 데이터 부족: 아직 진행된 과업이 없습니다.")
+                                    else:
+                                        top_prog = df_p_summ.loc[df_p_summ['진행률(%)'].idxmax()]
+                                        st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: {top_prog['자녀명']} {T_USER}의 '{top_prog['프로그램']}' 활동이 {top_prog['진행률(%)']}%로 가장 활발하게 진행 중입니다.</div></div>", unsafe_allow_html=True)
+                                        
+                            with p_col2:
+                                with st.container(border=True):
+                                    st.markdown(f"##### 📊 자녀별 평균 성취도")
+                                    fig_p2, ax_p2 = plt.subplots(figsize=(6, 4))
+                                    sns.barplot(data=df_p_summ, x='라벨', y='평균 성취도', ax=ax_p2, palette='flare')
+                                    ax_p2.set_ylim(0, 100)
+                                    st.pyplot(fig_p2)
+                                    
+                                    if df_p_summ['평균 성취도'].max() == 0:
+                                        st.info("📉 데이터 부족: 아직 평가 점수가 입력되지 않았습니다.")
+                                    else:
+                                        top_s = df_p_summ.loc[df_p_summ['평균 성취도'].idxmax()]
+                                        low_s_df = df_p_summ[df_p_summ['평균 성취도'] > 0]
+                                        low_s_df = low_s_df[low_s_df['평균 성취도'] < 60]
+                                        
+                                        pos_msg = f"<div class='pos-text'>🟢 긍정적 시그널: {top_s['자녀명']} {T_USER}의 '{top_s['프로그램']}' 성취도가 {top_s['평균 성취도']:.1f}점으로 가장 우수합니다.</div>"
+                                        neg_msg = ""
+                                        if not low_s_df.empty:
+                                            names = ", ".join(low_s_df['자녀명'].unique())
+                                            neg_msg = f"<div class='neg-text'>🔴 주의 요망: {names} {T_USER}의 일부 프로그램 성취도가 60점 미만입니다. 따뜻한 격려가 필요합니다.</div>"
+                                        st.markdown(f"<div class='report-box'>{pos_msg}{neg_msg}</div>", unsafe_allow_html=True)
+                            
+                            # AI 통합 리포트
+                            st.markdown("#### 💡 자녀 통합 분석 리포트")
+                            bad_att = [r['자녀명'] for r in p_summary_rows if r['결석_지각'] >= 3]
+                            
+                            if df_p_summ['평균 성취도'].max() == 0 and df_p_summ['진행률(%)'].max() == 0:
+                                 st.info("아직 활동 초기 단계입니다. 아이들이 즐겁게 시작할 수 있도록 응원해주세요!")
+                            else:
+                                 pos_text = "**[우리 아이들의 강점 🟢]**\n"
+                                 best_child = df_p_summ.loc[df_p_summ['평균 성취도'].idxmax()]['자녀명'] if df_p_summ['평균 성취도'].max() > 0 else df_p_summ.loc[df_p_summ['진행률(%)'].idxmax()]['자녀명']
+                                 pos_text += f"- **우수한 성과:** 특히 {best_child} {T_USER}이 전반적으로 훌륭한 모습을 보이며 수업에 잘 적응하고 있습니다.\n"
+                                 pos_text += f"- **다양한 경험:** 자녀들이 총 {len(p_summary_rows)}개의 과정에 참여하며 폭넓은 학습을 진행 중입니다.\n"
+                                 st.success(pos_text)
+                                 
+                                 neg_text = f"**[가정 내 지원이 필요한 부분 🔴]**\n"
+                                 needs_support = False
+                                 if bad_att:
+                                     neg_text += f"- **출결 관리:** {', '.join(set(bad_att))} {T_USER}의 결석/지각이 다소 누적되었습니다. 꾸준한 참여를 독려해 주세요.\n"
+                                     needs_support = True
+                                     
+                                 low_s_df2 = df_p_summ[(df_p_summ['평균 성취도'] > 0) & (df_p_summ['평균 성취도'] < 60)]
+                                 if not low_s_df2.empty:
+                                     neg_text += f"- **학습 격려:** 일부 프로그램에서 진도를 따라가기 어려워하는 모습이 보입니다. 담당 {T_ADMIN}과 상담을 진행해 보시는 것을 추천합니다.\n"
+                                     needs_support = True
+                                 
+                                 if not needs_support:
+                                     neg_text += "- **현재 상태:** 지각/결석이나 크게 부진한 과목 없이 자녀들이 아주 훌륭하게 활동을 소화하고 있습니다!\n"
+                                 st.error(neg_text)
+
+                    # --------------------------------------------
+                    # 개별 자녀 상세 탭
+                    # --------------------------------------------
                     for idx, s_info in enumerate(linked_students):
-                        with child_tabs[idx]:
+                        with parent_tabs[idx + 1]:
                             s_record = next((u for u in db['users'] if u['name'] == s_info['name'] and u['program'] == s_info['program']), None)
                             
                             if s_record:
@@ -615,13 +746,6 @@ elif st.session_state.menu_option == UI['menu4']:
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                # ==============================================================
-                # ✨ [UI 개선] 차트와 해석이 분리된 카드형 컬럼 레이아웃 적용
-                # ==============================================================
-                
-                # -------------------
-                # 상단 차트 1 & 2
-                # -------------------
                 dash_col1, dash_col2 = st.columns(2)
                 
                 with dash_col1:
@@ -664,11 +788,8 @@ elif st.session_state.menu_option == UI['menu4']:
                                 names = ", ".join(risk_users['Student'].tolist())
                                 st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 즉각 조치 요망: {names} {T_USER}의 성취도가 60점 미만으로 하위권에 머물러 있습니다. 이탈 방지를 위한 개별 상담이 필요합니다.</div></div>", unsafe_allow_html=True)
 
-                st.write("") # 간격 띄우기
+                st.write("") 
                 
-                # -------------------
-                # 하단 차트 3 & 4
-                # -------------------
                 dash_col3, dash_col4 = st.columns(2)
                 
                 with dash_col3:
