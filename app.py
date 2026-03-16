@@ -129,9 +129,22 @@ def load_data():
                 if 'parents' not in data: data['parents'] = []
                 if 'settings' not in data: data['settings'] = {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
                 if 'terms' not in data['settings']: data['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}
+                # ✨ 신규: UI 텍스트 동적 설정 추가
+                if 'ui' not in data['settings']:
+                    data['settings']['ui'] = {
+                        "brand_title": "Youth Canvas",
+                        "brand_subtitle": "청소년의 꿈을 그리는 공간",
+                        "menu1": "찾아보기 (탐색)",
+                        "menu2": "나의 이야기",
+                        "menu3": "👨‍👩‍👧 학부모 공간",
+                        "menu4": "관계자 외 출입금지",
+                        "page1_title": "✨ 지금 뜨고 있는 활동",
+                        "page2_title": "🙋 나의 활동 진행도",
+                        "page3_title": "🔒 관리자 전용 포털"
+                    }
                 return data
     except Exception as e: st.error(f"🚨 연결 오류: {e}")
-    return {"programs": [], "users": [], "parents": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31", "terms": {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}}}
+    return {"programs": [], "users": [], "parents": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31", "terms": {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}, "ui": {"brand_title": "Youth Canvas", "brand_subtitle": "청소년의 꿈을 그리는 공간", "menu1": "찾아보기 (탐색)", "menu2": "나의 이야기", "menu3": "👨‍👩‍👧 학부모 공간", "menu4": "관계자 외 출입금지", "page1_title": "✨ 지금 뜨고 있는 활동", "page2_title": "🙋 나의 활동 진행도", "page3_title": "🔒 관리자 전용 포털"}}}
 
 def save_data(data):
     try:
@@ -146,19 +159,26 @@ db = st.session_state['db']
 
 if 'settings' not in db: db['settings'] = {}
 if 'terms' not in db['settings']: db['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}
+if 'ui' not in db['settings']: db['settings']['ui'] = {"brand_title": "Youth Canvas", "brand_subtitle": "청소년의 꿈을 그리는 공간", "menu1": "찾아보기 (탐색)", "menu2": "나의 이야기", "menu3": "👨‍👩‍👧 학부모 공간", "menu4": "관계자 외 출입금지", "page1_title": "✨ 지금 뜨고 있는 활동", "page2_title": "🙋 나의 활동 진행도", "page3_title": "🔒 관리자 전용 포털"}
+
 T_SUPER = db['settings']['terms']['super']
 T_ADMIN = db['settings']['terms']['admin']
 T_USER = db['settings']['terms']['user']
 T_PARENT = db['settings']['terms']['parent']
 
-MENU_PARENT = f"👨‍👩‍👧 {T_PARENT} 공간"
+UI = db['settings']['ui']
 
-if 'menu_option' not in st.session_state: st.session_state.menu_option = "찾아보기 (탐색)"
-def change_page(page_name): st.session_state.menu_option = page_name; st.rerun()
+# 메뉴 선택 안전장치 로직
+menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4']]
+if 'menu_option' not in st.session_state or st.session_state.menu_option not in menu_list: 
+    st.session_state.menu_option = UI['menu1']
+
+def change_page(page_name): 
+    st.session_state.menu_option = page_name; st.rerun()
 
 with st.sidebar:
-    st.markdown("<div style='margin-bottom: 2rem; padding: 0 10px;'><div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div><div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div></div>", unsafe_allow_html=True)
-    menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", MENU_PARENT, "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", MENU_PARENT, "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
+    st.markdown(f"<div style='margin-bottom: 2rem; padding: 0 10px;'><div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>{UI['brand_title']}</div><div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>{UI['brand_subtitle']}</div></div>", unsafe_allow_html=True)
+    menu = st.radio("메뉴 이동", menu_list, index=menu_list.index(st.session_state.menu_option), label_visibility="collapsed")
     st.write(""); st.write("")
     if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
         st.session_state['db'] = load_data(); st.toast("✅ 동기화 완료!"); time.sleep(1); st.rerun()
@@ -167,8 +187,8 @@ st.session_state.menu_option = menu
 # =========================================================
 # [페이지 1] 메인 대시보드
 # =========================================================
-if st.session_state.menu_option == "찾아보기 (탐색)":
-    st.markdown(f"## ✨ 지금 뜨고 있는 활동")
+if st.session_state.menu_option == UI['menu1']:
+    st.markdown(f"## {UI['page1_title']}")
     st.write("") 
     if not db['programs']: st.info("아직 개설된 프로그램이 없습니다. 관리자 페이지에서 프로그램을 만들어주세요.")
         
@@ -237,13 +257,13 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                 
                 can_apply = is_recruiting_period and not is_all_full
                 if st.button("🚀 이 프로그램 지원하기", key=f"apply_{idx}", use_container_width=True, type="primary", disabled=not can_apply):
-                    st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
+                    st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu2'])
 
 # =========================================================
 # [페이지 2-1] 청소년 전용 페이지 
 # =========================================================
-elif st.session_state.menu_option == "나의 이야기":
-    st.markdown("## 🙋 나의 활동 진행도")
+elif st.session_state.menu_option == UI['menu2']:
+    st.markdown(f"## {UI['page2_title']}")
     tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 나의 목표 및 진행도 (로그인)"])
     
     with tab1:
@@ -293,9 +313,6 @@ elif st.session_state.menu_option == "나의 이야기":
             if login_attempt or (search_name and search_pin):
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
                 if my_data:
-                    # ==============================================================
-                    # ✨ [신규 기능] 학생 본인의 전체 프로그램 종합 대시보드 (최상단)
-                    # ==============================================================
                     st.divider()
                     st.markdown(f"### 🌟 **{search_name}**님의 종합 성장 대시보드")
                     st.info("현재 참여 중인 전체 프로그램의 진행 상황을 한눈에 파악해 보세요.")
@@ -339,11 +356,9 @@ elif st.session_state.menu_option == "나의 이야기":
                             "평균 성취도": avg_s
                         })
                     
-                    # 1. 종합 요약 표
                     df_summ = pd.DataFrame(summary_rows)
                     st.dataframe(df_summ, use_container_width=True, hide_index=True)
                     
-                    # 2. 종합 시각화 그래프
                     if not df_summ.empty:
                         fig_summ, (ax_s1, ax_s2) = plt.subplots(1, 2, figsize=(15, 4))
                         
@@ -359,7 +374,6 @@ elif st.session_state.menu_option == "나의 이야기":
                         
                         st.pyplot(fig_summ)
                         
-                    # 3. AI 학생 맞춤형 해석 리포트
                     st.markdown("#### 💡 나의 종합 분석 리포트")
                     overall_pct = int((total_d_all / total_t_all) * 100) if total_t_all > 0 else 0
                     overall_score = sum(all_scores) / len(all_scores) if all_scores else 0
@@ -390,9 +404,6 @@ elif st.session_state.menu_option == "나의 이야기":
                             neg_text += f"- **현재 상태:** 특별한 위험 요소나 부진한 과목 없이 아주 잘 관리되고 있습니다. 지금의 좋은 페이스를 계속 유지하세요!\n"
                         st.error(neg_text)
 
-                    # ==============================================================
-                    # 기존 개별 프로그램 상세 리포트
-                    # ==============================================================
                     st.divider()
                     st.markdown("### 🔍 개별 프로그램 세부 리포트")
                     
@@ -441,8 +452,8 @@ elif st.session_state.menu_option == "나의 이야기":
 # =========================================================
 # [페이지 2-2] 학부모 전용 라운지
 # =========================================================
-elif st.session_state.menu_option == MENU_PARENT:
-    st.markdown(f"## 👨‍👩‍👧 {T_PARENT} 전용 라운지")
+elif st.session_state.menu_option == UI['menu3']:
+    st.markdown(f"## {UI['menu3']}")
     st.caption(f"발급받으신 개별 {T_PARENT} 계정으로 로그인하여 자녀의 성장 기록과 커리큘럼을 확인하세요.")
     
     with st.container(border=True):
@@ -541,9 +552,9 @@ elif st.session_state.menu_option == MENU_PARENT:
 # =========================================================
 # [페이지 3] 관리자 페이지
 # =========================================================
-elif st.session_state.menu_option == "관계자 외 출입금지":
+elif st.session_state.menu_option == UI['menu4']:
     if not st.session_state.get('admin_logged_in', False):
-        st.markdown("## 🔒 관리자 전용 포털")
+        st.markdown(f"## {UI['page3_title']}")
         with st.container(border=True):
             st.info("💡 초기 세팅: 이름 [ 마스터 ], 비밀번호 [ 0000 ]")
             with st.form("admin_login_form"):
@@ -565,7 +576,8 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
             
         tab_parent_title = f"👨‍👩‍👧 {T_PARENT} 계정"
         if is_super:
-            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"]
+            # ✨ 마스터에게만 UI 설정 탭 노출
+            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "📝 신규 개설", "🎨 화면 설정", "⚙️ 정보 수정", "🔐 계정 관리"]
         else:
             tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "⚙️ 정보 수정", "🔐 계정 관리"]
 
@@ -573,7 +585,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents = tabs[:6]
         
         if is_super:
-            tab_create, tab_edit, tab_settings = tabs[6:]
+            tab_create, tab_ui, tab_edit, tab_settings = tabs[6:]
         else:
             tab_edit, tab_settings = tabs[6:]
         
@@ -606,10 +618,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                # ==============================================================
-                # ✨ [신규 기능] 4개 차트 각각에 대한 지능형 텍스트 해석 리포트
-                # ==============================================================
-                
                 fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                 ax1.set_title('Average Score by Program')
@@ -1097,7 +1105,50 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
                         if save_data(db): st.rerun()
 
+        # ✨ [신규 기능] 마스터 권한 전용 '화면 텍스트 맞춤 설정' 탭
         if is_super:
+            with tab_ui:
+                st.subheader("🎨 화면 UI 및 텍스트 맞춤 설정")
+                st.info("💡 사이드바 메뉴명, 메인 로고, 타이틀 등 화면에 고정된 텍스트와 이모티콘을 기관의 입맛에 맞게 자유롭게 변경하세요.")
+                with st.form("ui_setting_form"):
+                    st.write("##### 1. 브랜드 & 메인 로고")
+                    c1, c2 = st.columns(2)
+                    new_brand_title = c1.text_input("메인 로고 (예: Youth Canvas, 청소년수련관)", value=UI.get('brand_title', 'Youth Canvas'))
+                    new_brand_sub = c2.text_input("서브 타이틀 (예: 청소년의 꿈을 그리는 공간)", value=UI.get('brand_subtitle', '청소년의 꿈을 그리는 공간'))
+                    
+                    st.write("##### 2. 좌측 사이드바 메뉴명")
+                    c3, c4 = st.columns(2)
+                    new_m1 = c3.text_input("메뉴 1 (기본: 찾아보기)", value=UI.get('menu1', '찾아보기 (탐색)'))
+                    new_m2 = c4.text_input("메뉴 2 (기본: 나의 이야기)", value=UI.get('menu2', '나의 이야기'))
+                    c5, c6 = st.columns(2)
+                    new_m3 = c5.text_input("메뉴 3 (기본: 학부모 공간)", value=UI.get('menu3', '👨‍👩‍👧 학부모 공간'))
+                    new_m4 = c6.text_input("메뉴 4 (기본: 관계자 외 출입금지)", value=UI.get('menu4', '관계자 외 출입금지'))
+                    
+                    st.write("##### 3. 페이지별 최상단 메인 제목")
+                    c7, c8, c9 = st.columns(3)
+                    new_p1 = c7.text_input("메뉴 1 페이지 제목", value=UI.get('page1_title', '✨ 지금 뜨고 있는 청소년 활동'))
+                    new_p2 = c8.text_input("메뉴 2 페이지 제목", value=UI.get('page2_title', '🙋 나의 활동 진행도'))
+                    new_p3 = c9.text_input("메뉴 4 페이지 제목", value=UI.get('page3_title', '🔒 관리자 전용 포털'))
+                    
+                    if st.form_submit_button("UI 텍스트 저장 및 즉시 적용", type="primary"):
+                        db['settings']['ui'] = {
+                            "brand_title": new_brand_title,
+                            "brand_subtitle": new_brand_sub,
+                            "menu1": new_m1,
+                            "menu2": new_m2,
+                            "menu3": new_m3,
+                            "menu4": new_m4,
+                            "page1_title": new_p1,
+                            "page2_title": new_p2,
+                            "page3_title": new_p3
+                        }
+                        if save_data(db):
+                            st.success("화면 텍스트가 성공적으로 변경되었습니다!")
+                            time.sleep(1)
+                            # 이름을 바꾸면 현재 메뉴에서 튕기지 않도록 안전하게 이동
+                            st.session_state.menu_option = new_m4 
+                            st.rerun()
+
             with tab_create:
                 with st.form("create_form"):
                     c1, c2 = st.columns([8, 2])
@@ -1239,24 +1290,19 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
             
             if is_super:
                 with st.container(border=True):
-                    st.subheader("🔤 맞춤형 호칭 설정 (화면 표시 명칭 변경)")
-                    st.info("💡 기관의 성격(학원, 청소년센터, 장애인기관 등)에 맞게 화면에 표시되는 호칭을 변경하세요.")
+                    st.subheader("🔤 맞춤형 호칭 설정 (명칭 변수 변경)")
+                    st.info("💡 기관의 성격에 맞게 시스템상에서 사람을 부르는 호칭을 일괄 변경하세요.")
                     with st.form("terms_form"):
                         c1, c2, c3, c4 = st.columns(4)
-                        new_t_super = c1.text_input("최고관리자 호칭", value=T_SUPER, placeholder="예: 원장님, 최고관리자")
-                        new_t_admin = c2.text_input("일반관리자 호칭", value=T_ADMIN, placeholder="예: 선생님, 청소년지도사")
-                        new_t_user = c3.text_input("이용자 호칭", value=T_USER, placeholder="예: 학생, 청소년, 이용자")
-                        new_t_parent = c4.text_input("보호자 호칭", value=T_PARENT, placeholder="예: 학부모, 보호자")
+                        new_t_super = c1.text_input("최고관리자 호칭", value=T_SUPER)
+                        new_t_admin = c2.text_input("일반관리자 호칭", value=T_ADMIN)
+                        new_t_user = c3.text_input("이용자 호칭", value=T_USER)
+                        new_t_parent = c4.text_input("보호자 호칭", value=T_PARENT)
                         
                         if st.form_submit_button("호칭 변경 적용", type="primary"):
-                            db['settings']['terms'] = {
-                                "super": new_t_super,
-                                "admin": new_t_admin,
-                                "user": new_t_user,
-                                "parent": new_t_parent
-                            }
+                            db['settings']['terms'] = {"super": new_t_super, "admin": new_t_admin, "user": new_t_user, "parent": new_t_parent}
                             if save_data(db):
-                                st.success("모든 메뉴와 화면의 호칭이 기관에 맞게 성공적으로 변경되었습니다!")
+                                st.success("시스템 호칭이 성공적으로 변경되었습니다!")
                                 time.sleep(1)
                                 st.rerun()
                 
