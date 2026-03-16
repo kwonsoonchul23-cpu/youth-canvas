@@ -138,7 +138,6 @@ def save_data(data):
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
 
-# ✨ 용어(Terminology) 변수 전역 설정
 if 'settings' not in db: db['settings'] = {}
 if 'terms' not in db['settings']: db['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}
 T_SUPER = db['settings']['terms']['super']
@@ -235,7 +234,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지 
+# [페이지 2-1] 청소년 전용 페이지
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 진행도")
@@ -835,7 +834,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     tu = db['users'][t_idx]
                     
                     with st.container(border=True):
-                        # ✨ 채팅 분리 및 동적 용어 적용
                         chat_target = st.radio("💬 대화 상대 선택", [f"👦 {T_USER}과 대화", f"👨‍👩‍👧 {T_PARENT}와 대화"], horizontal=True)
                         msg_key = 'messages' if chat_target == f"👦 {T_USER}과 대화" else 'parent_messages'
                         
@@ -850,17 +848,46 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             if c2.form_submit_button("전송") and ri:
                                 tu.setdefault(msg_key, []).append({"sender": "admin", "content": ri})
                                 if save_data(db): st.rerun()
-                    if st.button(f"❌ {T_USER} 강제 퇴소(삭제)", type="primary"):
+                    
+                    # ✨ [신규] 학생 정보 (이름/비번) 수정 에디터
+                    st.divider()
+                    st.write(f"#### ✏️ {T_USER} 정보 수정")
+                    with st.form(f"edit_user_form_{t_idx}"):
+                        c_u1, c_u2 = st.columns(2)
+                        edit_u_name = c_u1.text_input(f"새 {T_USER}명", value=tu['name'])
+                        edit_u_pin = c_u2.text_input("새 비밀번호 (4자리 숫자)", value=tu.get('pin', '0000'), max_chars=4)
+                        
+                        if st.form_submit_button(f"{T_USER} 정보 수정 저장", type="primary"):
+                            if edit_u_name and len(edit_u_pin) == 4 and edit_u_pin.isdigit():
+                                old_u_name = tu['name']
+                                # 이름 변경 시 학부모 연결 데이터 무결성 보호 업데이트
+                                if old_u_name != edit_u_name:
+                                    for p in db['parents']:
+                                        for s in p.get('linked_students', []):
+                                            if s['name'] == old_u_name and s['program'] == tu['program']:
+                                                s['name'] = edit_u_name
+                                                
+                                tu['name'] = edit_u_name
+                                tu['pin'] = edit_u_pin
+                                if save_data(db):
+                                    st.success(f"{T_USER} 정보가 완벽하게 수정되었습니다!")
+                                    time.sleep(1)
+                                    st.rerun()
+                            else:
+                                st.error("올바른 이름과 4자리 숫자 비밀번호를 입력하세요.")
+                                
+                    if st.button(f"❌ {T_USER} 강제 퇴소(삭제)"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
         with tab_parents:
-            st.subheader(f"👨‍👩‍👧 {T_PARENT} 계정 발급 및 연결")
-            st.info(f"💡 {T_PARENT} 전용 계정을 만들고, 열람할 수 있는 대상을 선택해 연결합니다.")
+            st.subheader(f"👨‍👩‍👧 {T_PARENT} 계정 발급 및 관리")
+            st.info(f"💡 {T_PARENT} 전용 계정을 만들거나 수정하고, 열람할 수 있는 대상을 연결합니다.")
             
             if not my_programs:
                 st.warning("담당 중인 프로그램이 없습니다.")
             else:
                 with st.form("parent_create_form"):
+                    st.write(f"**➕ 신규 {T_PARENT} 계정 발급**")
                     col1, col2 = st.columns(2)
                     p_name = col1.text_input(f"{T_PARENT} 이름 (예: 권해리 어머니)")
                     p_pin = col2.text_input(f"{T_PARENT}용 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
@@ -868,26 +895,23 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     all_students = [f"{u['name']} - {u['program']} ({u['role']})" for u in db['users'] if u['program'] in my_programs]
                     linked_sts = st.multiselect(f"이 계정과 연결할 {T_USER} 선택 (다중 선택 가능)", all_students)
                     
-                    if st.form_submit_button(f"{T_PARENT} 계정 발급 및 연결", type="primary"):
+                    if st.form_submit_button(f"{T_PARENT} 계정 신규 발급", type="primary"):
                         if p_name and len(p_pin) == 4 and p_pin.isdigit() and linked_sts:
-                            existing_p = next((p for p in db['parents'] if p['name'] == p_name and p['pin'] == p_pin), None)
-                            
-                            parsed_students = []
-                            for st_str in linked_sts:
-                                s_name = st_str.split(" - ")[0]
-                                s_prog = st_str.split(" - ")[1].split(" (")[0]
-                                parsed_students.append({"name": s_name, "program": s_prog})
-                                
+                            existing_p = next((p for p in db['parents'] if p['name'] == p_name), None)
                             if existing_p:
-                                existing_p['linked_students'] = parsed_students
-                                st.success(f"[{p_name}] 계정의 연결 정보가 성공적으로 업데이트되었습니다!")
+                                st.error("이미 존재하는 이름입니다. 정보 수정을 이용해주세요.")
                             else:
+                                parsed_students = []
+                                for st_str in linked_sts:
+                                    s_name = st_str.split(" - ")[0]
+                                    s_prog = st_str.split(" - ")[1].split(" (")[0]
+                                    parsed_students.append({"name": s_name, "program": s_prog})
+                                    
                                 db['parents'].append({"name": p_name, "pin": p_pin, "linked_students": parsed_students})
-                                st.success(f"[{p_name}] 계정이 신규 발급되었습니다!")
-                                
-                            if save_data(db):
-                                time.sleep(1)
-                                st.rerun()
+                                if save_data(db):
+                                    st.success(f"[{p_name}] 계정이 신규 발급되었습니다!")
+                                    time.sleep(1)
+                                    st.rerun()
                         else:
                             st.error("이름, 4자리 숫자 비밀번호, 연결할 대상을 모두 올바르게 입력해주세요.")
                             
@@ -901,6 +925,41 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             else:
                                 st.write("연결된 데이터가 없습니다.")
                     
+                    # ✨ [신규] 학부모 정보 (이름/비번/연결자녀) 수정 에디터
+                    st.divider()
+                    st.write(f"#### ✏️ 기존 {T_PARENT} 정보 수정")
+                    p_to_edit_name = st.selectbox(f"수정할 {T_PARENT} 선택", [p['name'] for p in db['parents']])
+                    p_to_edit = next(p for p in db['parents'] if p['name'] == p_to_edit_name)
+                    
+                    with st.form("edit_parent_form"):
+                        c1, c2 = st.columns(2)
+                        new_p_name = c1.text_input("새 이름", value=p_to_edit['name'])
+                        new_p_pin = c2.text_input("새 비밀번호 (4자리 숫자)", value=p_to_edit['pin'], max_chars=4)
+                        
+                        current_linked = [f"{s['name']} - {s['program']} ({next((u['role'] for u in db['users'] if u['name']==s['name'] and u['program']==s['program']), '알수없음')})" for s in p_to_edit.get('linked_students', [])]
+                        valid_current = [x for x in current_linked if x in all_students]
+                        
+                        new_linked_sts = st.multiselect(f"연결할 {T_USER} 수정", all_students, default=valid_current)
+                        
+                        if st.form_submit_button(f"{T_PARENT} 정보 수정 저장", type="primary"):
+                            if new_p_name and len(new_p_pin) == 4 and new_p_pin.isdigit():
+                                p_to_edit['name'] = new_p_name
+                                p_to_edit['pin'] = new_p_pin
+                                
+                                parsed_students = []
+                                for st_str in new_linked_sts:
+                                    s_name = st_str.split(" - ")[0]
+                                    s_prog = st_str.split(" - ")[1].split(" (")[0]
+                                    parsed_students.append({"name": s_name, "program": s_prog})
+                                p_to_edit['linked_students'] = parsed_students
+                                
+                                if save_data(db):
+                                    st.success("수정 완료!")
+                                    time.sleep(1)
+                                    st.rerun()
+                            else:
+                                st.error("올바른 값을 입력하세요.")
+
                     st.divider()
                     st.write(f"#### 🗑️ {T_PARENT} 계정 영구 삭제")
                     del_p = st.selectbox("삭제할 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed")
@@ -995,10 +1054,15 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             
                             old_title = p_data['title']
                             
+                            # ✨ [핵심 무결성 보완] 프로그램 이름 변경 시 학부모 연결 데이터 자동 갱신
                             if new_t != old_title:
                                 for a in db['admins']:
                                     if old_title in a.get('programs', []):
                                         a['programs'] = [new_t if x == old_title else x for x in a['programs']]
+                                for p in db['parents']:
+                                    for s in p.get('linked_students', []):
+                                        if s['program'] == old_title:
+                                            s['program'] = new_t
                                         
                             for u in db['users']:
                                 if u['program'] == old_title:
@@ -1035,8 +1099,8 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
 
         with tab_settings:
             with st.form("pin_form"):
-                npin = st.text_input("새 4자리 비밀번호", type="password", max_chars=4)
-                if st.form_submit_button("비밀번호 변경"):
+                npin = st.text_input("내 계정 새 비밀번호 변경 (4자리)", type="password", max_chars=4)
+                if st.form_submit_button("변경 적용"):
                     if len(npin) == 4 and npin.isdigit():
                         adm = next(a for a in db['admins'] if a['name'] == admin_info['name'])
                         op = adm['pin']; adm['pin'] = npin
@@ -1045,7 +1109,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     else: st.error("4자리 숫자로 입력해주세요.")
             
             if is_super:
-                # ✨ [신규 기능] 용어 화이트라벨 설정 패널 추가!
                 with st.container(border=True):
                     st.subheader("🔤 맞춤형 호칭 설정 (화면 표시 명칭 변경)")
                     st.info("💡 기관의 성격(학원, 청소년센터, 장애인기관 등)에 맞게 화면에 표시되는 호칭을 변경하세요.")
@@ -1069,15 +1132,16 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 st.rerun()
                 
                 with st.container(border=True):
-                    st.subheader(f"👑 {T_SUPER}: {T_ADMIN} 계정 발급")
+                    st.subheader(f"👑 {T_SUPER}: {T_ADMIN} 계정 관리")
                     with st.form("new_admin_form"):
+                        st.write(f"**➕ 신규 {T_ADMIN} 계정 생성**")
                         colA, colB = st.columns(2)
-                        new_adm_name = colA.text_input(f"새 {T_ADMIN} 이름 (예: 김철수 선생님)")
+                        new_adm_name = colA.text_input(f"이름 (예: 김철수 선생님)")
                         new_adm_pin = colB.text_input("초기 비밀번호 4자리", max_chars=4)
                         all_prog_titles = [p['title'] for p in db['programs']]
                         assign_progs = st.multiselect("담당 프로그램 할당", all_prog_titles)
                         
-                        if st.form_submit_button(f"{T_ADMIN} 계정 생성", type="primary"):
+                        if st.form_submit_button(f"계정 생성", type="primary"):
                             if not new_adm_name or len(new_adm_pin) != 4 or not new_adm_pin.isdigit():
                                 st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
                             else:
@@ -1091,13 +1155,39 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     df_admins = pd.DataFrame([{"이름": a['name'], "권한": T_SUPER if a['role'] == "super" else T_ADMIN, "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
                     st.dataframe(df_admins, hide_index=True, use_container_width=True)
                     
+                    # ✨ [신규] 관리자 정보 (이름/비번/프로그램) 수정 에디터
                     st.divider()
-                    st.write(f"#### 🗑️ {T_ADMIN} 계정 강제 삭제")
+                    st.write(f"#### ✏️ 기존 {T_ADMIN} 정보 수정")
                     normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
                     if normal_admins:
+                        a_to_edit_name = st.selectbox(f"수정할 {T_ADMIN} 선택", normal_admins)
+                        a_to_edit = next(a for a in db['admins'] if a['name'] == a_to_edit_name)
+                        
+                        with st.form("edit_admin_form"):
+                            c1, c2 = st.columns(2)
+                            new_a_name = c1.text_input("새 이름", value=a_to_edit['name'])
+                            new_a_pin = c2.text_input("새 비밀번호 (4자리)", value=a_to_edit['pin'], max_chars=4)
+                            
+                            valid_progs = [p for p in a_to_edit.get('programs', []) if p in all_prog_titles]
+                            new_assign_progs = st.multiselect("담당 프로그램 수정", all_prog_titles, default=valid_progs)
+                            
+                            if st.form_submit_button("정보 수정 저장", type="primary"):
+                                if new_a_name and len(new_a_pin) == 4 and new_a_pin.isdigit():
+                                    a_to_edit['name'] = new_a_name
+                                    a_to_edit['pin'] = new_a_pin
+                                    a_to_edit['programs'] = new_assign_progs
+                                    if save_data(db):
+                                        st.success("수정 완료!")
+                                        time.sleep(1)
+                                        st.rerun()
+                                else:
+                                    st.error("올바른 값을 입력하세요.")
+
+                        st.divider()
+                        st.write(f"#### 🗑️ {T_ADMIN} 계정 강제 삭제")
                         col_del1, col_del2 = st.columns([8, 2])
-                        admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed")
-                        if col_del2.button("❌ 계정 삭제", type="primary", use_container_width=True):
+                        admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed", key="del_admin_select")
+                        if col_del2.button("❌ 선택 계정 삭제", type="primary", use_container_width=True):
                             temp_admins = copy.deepcopy(db['admins'])
                             db['admins'] = [a for a in db['admins'] if a['name'] != admin_to_delete]
                             if save_data(db):
@@ -1105,4 +1195,4 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             else:
                                 db['admins'] = temp_admins
                     else:
-                        st.info("현재 삭제할 수 있는 일반 계정이 없습니다.")
+                        st.info("현재 수정하거나 삭제할 수 있는 일반 계정이 없습니다.")
