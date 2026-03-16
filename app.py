@@ -360,7 +360,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
         if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
-        # ✨ 권한에 따른 탭 동적 생성 (RBAC 적용 완료)
         tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "⚙️ 정보 수정", "🔐 계정 관리"]
         if is_super:
             tab_titles.insert(5, "📝 신규 개설")
@@ -374,14 +373,14 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
             tab_edit, tab_settings = tabs[5:]
         
         with tab_dashboard:
-            # ✨ 마스터/일반 강사에 따른 호칭 동적 변경
             dashboard_title = "학원장 전용" if is_super else f"{admin_info['name']} 선생님 전용"
             insight_caller = "원장님" if is_super else f"{admin_info['name']} 선생님"
             
             st.subheader(f"📈 {dashboard_title} 통합 경영 대시보드")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             
-            if not users_to_show: st.info("데이터가 부족하여 대시보드를 생성할 수 없습니다.")
+            if not users_to_show: 
+                st.info("데이터가 부족하여 대시보드를 생성할 수 없습니다.")
             else:
                 dashboard_data = []
                 task_data = []
@@ -402,6 +401,39 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
+                # ✨ [신규 기능] 그래프 자동 해석 리포트 (긍정/부정)
+                st.markdown("#### 💡 AI 데이터 분석 해석 리포트")
+                if not df_dash.empty:
+                    # 1. 긍정적 요인 계산
+                    top_prog = df_dash.groupby('Program')['AvgScore'].mean().idxmax()
+                    top_score = df_dash.groupby('Program')['AvgScore'].mean().max()
+                    
+                    pos_text = f"**[긍정적 시그널 🟢]**\n"
+                    pos_text += f"- **우수 프로그램:** '{top_prog}' 프로그램이 평균 성취도 {top_score:.1f}점으로 가장 훌륭한 학업 성과를 내고 있습니다.\n"
+                    
+                    corr = df_dash['Comments'].corr(df_dash['AvgScore'])
+                    if pd.notna(corr) and corr > 0.3:
+                        pos_text += f"- **피드백 효과:** 선생님의 코멘트 수와 학생 성취도 간에 긍정적인 상관관계(계수: {corr:.2f})가 확인되었습니다. 선생님의 관심이 성적 향상으로 직결되고 있습니다.\n"
+                    st.success(pos_text)
+                    
+                    # 2. 부정적(위험) 요인 계산
+                    neg_text = f"**[주의 및 개선 필요 🔴]**\n"
+                    low_students = df_dash[df_dash['AvgScore'] < 60]
+                    if not low_students.empty:
+                        names = ", ".join(low_students['Student'].tolist())
+                        neg_text += f"- **성취도 부진 학생:** {names} 학생의 평균 성취도가 60점 미만입니다. 빠른 개별 면담과 학습 독려가 필요합니다.\n"
+                    else:
+                        neg_text += f"- **이탈 위험 점검:** 현재 성취도가 심각하게 낮은(60점 미만) 이탈 위험 학생은 없습니다. 훌륭하게 관리되고 있습니다.\n"
+                        
+                    if not df_tasks.empty:
+                        hard_task = df_tasks.groupby('Task')['Score'].mean().idxmin()
+                        hard_score = df_tasks.groupby('Task')['Score'].mean().min()
+                        if hard_score < 70:
+                            neg_text += f"- **커리큘럼 난이도 점검:** '{hard_task}' 주차/과업의 평균 점수가 {hard_score:.1f}점으로 전체 중 가장 낮습니다. 학생들에게 난이도가 높을 수 있으니 세부 내용이나 진도를 조율해 보세요.\n"
+                    st.error(neg_text)
+                    st.divider()
+
+                # 기존 시각화 그래프
                 st.markdown("##### 🔍 프로그램별 성과 및 이상치 탐지")
                 fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
@@ -414,7 +446,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax2.set_ylim(0, 100)
                 ax2.tick_params(axis='x', rotation=45)
                 st.pyplot(fig1)
-                st.info(f"💡 **{insight_caller} 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
 
                 st.markdown("##### 🔍 강사 관리 효율성 및 과업 난이도 분석")
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
@@ -427,10 +458,10 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
-                st.info(f"💡 **{insight_caller} 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
 
+        # ✨ [UI 개선] 평가 화면에서 '세부 내용' 명확히 표시
         with tab_eval:
-            st.subheader("📝 학생 종합 평가 및 코멘트 작성")
+            st.subheader("📝 학생 주차/과업별 달성도 및 코멘트 평가")
             if not my_programs: st.info("담당 프로그램이 없습니다.")
             else:
                 col_sel1, col_sel2 = st.columns([5, 5])
@@ -444,14 +475,23 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     target_idx = eval_user_options[selected_user_label]
                     target_user = db['users'][target_idx]
                     
-                    st.write(f"#### 🏅 {target_user['name']} 학생 과업 평가")
+                    st.write(f"#### 🏅 {target_user['name']} 학생 평가 입력")
+                    st.info("💡 각 주차(과업)의 세부 내용을 확인하시고, 이를 종합하여 성취도 점수와 피드백 코멘트를 남겨주세요.")
+                    
                     with st.form(f"eval_form_{target_idx}"):
                         for t_idx, t in enumerate(target_user['workflow']):
-                            st.markdown(f"**[{t['task']}]**")
+                            st.markdown(f"**[{t['task']}]** <span style='color:gray; font-size:0.85em;'>*(기간: {get_date_label(t).strip()})*</span>", unsafe_allow_html=True)
+                            
+                            # 세부 내용(서브태스크) 표시하여 평가 시 참고하도록 함
+                            if t.get('subtasks'):
+                                sub_texts = [f"↳ {stask['desc']} {'(✅완료)' if stask.get('done') else '(미완료)'}" for stask in t['subtasks']]
+                                st.caption("\n".join(sub_texts))
+                            
                             c1, c2 = st.columns([3, 7])
-                            new_score = c1.slider("성취도 점수", 0, 100, t.get('score', 0), key=f"score_{target_idx}_{t_idx}")
-                            new_comment = c2.text_input("학부모 전송용 코멘트", value=t.get('comment', ''), placeholder="따뜻한 피드백을 적어주세요.", key=f"comment_{target_idx}_{t_idx}")
-                            st.write("")
+                            new_score = c1.slider("해당 주차 종합 성취도 점수", 0, 100, t.get('score', 0), key=f"score_{target_idx}_{t_idx}")
+                            new_comment = c2.text_input("학부모 전송용 코멘트", value=t.get('comment', ''), placeholder="이 주차의 세부 목표 달성도에 대한 칭찬이나 아쉬운 점을 적어주세요.", key=f"comment_{target_idx}_{t_idx}")
+                            st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+                            
                             target_user['workflow'][t_idx]['score'] = new_score
                             target_user['workflow'][t_idx]['comment'] = new_comment
                             
@@ -689,7 +729,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
-        # ✨ 일반 관리자에게는 숨겨지는 탭 1 (신규 개설)
         if is_super:
             with tab_create:
                 with st.form("create_form"):
