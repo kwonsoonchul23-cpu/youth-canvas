@@ -475,8 +475,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 c1, c2 = st.columns([8, 2])
                 t = c1.text_input("프로그램 명")
                 color = c2.color_picker("색상", "#4f46e5")
-                rs, re = st.columns(2)
-                r_s = rs.date_input("시작일"); r_e = re.date_input("종료일")
+                # ✨ 버그 원인 해결: re -> col_re 로 변수명 변경
+                col_rs, col_re = st.columns(2) 
+                r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
                 d = st.text_area("소개"); v = st.text_input("유튜브 링크")
                 w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
                 
@@ -500,7 +501,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
                     else: db['programs'].pop()
 
-        # ✨ [복구 완료] 정보 수정 탭 완벽하게 부활!
+        # ✨ [복구 완료] 정보 수정 기능 부활
         with tab_edit:
             if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
             else:
@@ -557,13 +558,11 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             
                             old_title = p_data['title']
                             
-                            # 1. 관리자 권한 내 프로그램명 변경
                             if new_t != old_title:
                                 for a in db['admins']:
                                     if old_title in a.get('programs', []):
                                         a['programs'] = [new_t if x == old_title else x for x in a['programs']]
                                         
-                            # 2. 기존 학생들의 진도, 코멘트, 점수 보존 처리 (핵심!)
                             for u in db['users']:
                                 if u['program'] == old_title:
                                     u['program'] = new_t 
@@ -581,7 +580,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                                                 new_st_dict['done'] = old_st_dict.get('done', False)
                                         u['workflow'] = new_user_workflow
                             
-                            # 3. 프로그램 업데이트
                             temp_prog = db['programs'][p_idx]
                             db['programs'][p_idx] = {
                                 "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
@@ -607,3 +605,4 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         op = adm['pin']; adm['pin'] = npin
                         if save_data(db): st.success("변경 완료. 다시 로그인하세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
                         else: adm['pin'] = op
+                    else: st.error("4자리 숫자로 입력해주세요.")
