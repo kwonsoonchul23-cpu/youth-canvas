@@ -66,7 +66,7 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* 사이드바 UI 커스텀 */
+    /* 사이드바 UI 커스텀 (메뉴 4개 컬러 배분) */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
@@ -293,48 +293,149 @@ elif st.session_state.menu_option == "나의 이야기":
             if login_attempt or (search_name and search_pin):
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
                 if my_data:
+                    # ==============================================================
+                    # ✨ [신규 기능] 학생 본인의 전체 프로그램 종합 대시보드 (최상단)
+                    # ==============================================================
+                    st.divider()
+                    st.markdown(f"### 🌟 **{search_name}**님의 종합 성장 대시보드")
+                    st.info("현재 참여 중인 전체 프로그램의 진행 상황을 한눈에 파악해 보세요.")
+                    
+                    summary_rows = []
+                    total_t_all = 0
+                    total_d_all = 0
+                    all_scores = []
+                    att_counts = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}
+                    
+                    for d in my_data:
+                        t_items = 0
+                        d_items = 0
+                        s_list = []
+                        
+                        for t in d['workflow']:
+                            t_items += 1
+                            d_items += 1 if t.get('done') else 0
+                            if t.get('score', 0) > 0:
+                                s_list.append(t.get('score'))
+                            for stask in t.get('subtasks', []):
+                                t_items += 1
+                                d_items += 1 if stask.get('done') else 0
+                                
+                        pct = int((d_items/t_items)*100) if t_items > 0 else 0
+                        avg_s = sum(s_list)/len(s_list) if s_list else 0
+                        
+                        for att_info in d.get('attendance', {}).values():
+                            st_val = att_info.get('status')
+                            if st_val in att_counts:
+                                att_counts[st_val] += 1
+                                
+                        total_t_all += t_items
+                        total_d_all += d_items
+                        all_scores.extend(s_list)
+                        
+                        summary_rows.append({
+                            "프로그램": d['program'],
+                            "역할": d['role'],
+                            "진행률(%)": pct,
+                            "평균 성취도": avg_s
+                        })
+                    
+                    # 1. 종합 요약 표
+                    df_summ = pd.DataFrame(summary_rows)
+                    st.dataframe(df_summ, use_container_width=True, hide_index=True)
+                    
+                    # 2. 종합 시각화 그래프
+                    if not df_summ.empty:
+                        fig_summ, (ax_s1, ax_s2) = plt.subplots(1, 2, figsize=(15, 4))
+                        
+                        sns.barplot(data=df_summ, x='프로그램', y='진행률(%)', ax=ax_s1, palette='mako')
+                        ax_s1.set_title('My Program Completion Rate (%)')
+                        ax_s1.set_ylim(0, 100)
+                        ax_s1.tick_params(axis='x', rotation=15)
+                        
+                        sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
+                        ax_s2.set_title('My Average Score by Program')
+                        ax_s2.set_ylim(0, 100)
+                        ax_s2.tick_params(axis='x', rotation=15)
+                        
+                        st.pyplot(fig_summ)
+                        
+                    # 3. AI 학생 맞춤형 해석 리포트
+                    st.markdown("#### 💡 나의 종합 분석 리포트")
+                    overall_pct = int((total_d_all / total_t_all) * 100) if total_t_all > 0 else 0
+                    overall_score = sum(all_scores) / len(all_scores) if all_scores else 0
+                    
+                    if overall_score == 0 and overall_pct == 0:
+                        st.info("📉 **데이터 부족:** 아직 활동을 시작하지 않았거나 평가가 누적되지 않았습니다. 체크리스트를 하나씩 달성하며 성장해 보세요!")
+                    else:
+                        pos_text = f"**[나의 강점 🟢]**\n"
+                        if overall_pct >= 80:
+                            pos_text += f"- **뛰어난 실행력:** 전체 목표 달성률이 {overall_pct}%로 매우 훌륭합니다. 성실하게 참여하고 있습니다!\n"
+                        if overall_score >= 80:
+                            pos_text += f"- **우수한 성취도:** 전반적인 활동 성취도 평균이 {overall_score:.1f}점으로 탁월한 능력을 보여주고 있습니다.\n"
+                        if "뛰어난" not in pos_text and "우수한" not in pos_text:
+                            pos_text += f"- **꾸준한 참여:** 현재 {len(my_data)}개의 프로그램에 참여하며 다양한 경험을 쌓아가고 있습니다. 멋진 도전입니다!\n"
+                        st.success(pos_text)
+                        
+                        neg_text = f"**[성장을 위한 팁 🔴]**\n"
+                        needs_improvement = False
+                        low_prog = [r['프로그램'] for r in summary_rows if r['평균 성취도'] > 0 and r['평균 성취도'] < 60]
+                        if low_prog:
+                            neg_text += f"- **집중 필요:** '{', '.join(low_prog)}' 프로그램의 점수가 조금 아쉽습니다. 해당 파트의 {T_ADMIN}님과 소통하며 부족한 점을 채워보세요.\n"
+                            needs_improvement = True
+                        if att_counts['결석'] + att_counts['지각'] >= 3:
+                            neg_text += f"- **출결 관리:** 누적 결석/지각이 {att_counts['결석'] + att_counts['지각']}회 기록되었습니다. 성실한 출결은 모든 성장의 기본입니다!\n"
+                            needs_improvement = True
+                            
+                        if not needs_improvement:
+                            neg_text += f"- **현재 상태:** 특별한 위험 요소나 부진한 과목 없이 아주 잘 관리되고 있습니다. 지금의 좋은 페이스를 계속 유지하세요!\n"
+                        st.error(neg_text)
+
+                    # ==============================================================
+                    # 기존 개별 프로그램 상세 리포트
+                    # ==============================================================
+                    st.divider()
+                    st.markdown("### 🔍 개별 프로그램 세부 리포트")
+                    
                     for u_idx, data in enumerate(my_data):
-                        st.divider()
-                        st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님", unsafe_allow_html=True)
-                        st.markdown(f"<span class='badge-blue'>담당 역할: {data['role']}</span>", unsafe_allow_html=True)
-                        st.write("")
-                        
-                        tasks = data['workflow']
-                        total_items = 0; done_items = 0
-                        for t in tasks:
-                            total_items += 1; done_items += 1 if t.get('done') else 0
-                            for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
-                        pct = int((done_items/total_items)*100) if total_items > 0 else 0
-                        
-                        st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
-                        st.progress(pct / 100)
+                        with st.expander(f"📁 {data['program']} ({data['role']}) 상세 보기", expanded=False):
+                            st.write("")
+                            
+                            tasks = data['workflow']
+                            total_items = 0; done_items = 0
+                            for t in tasks:
+                                total_items += 1; done_items += 1 if t.get('done') else 0
+                                for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
+                            pct = int((done_items/total_items)*100) if total_items > 0 else 0
+                            
+                            st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                            st.progress(pct / 100)
 
-                        st.write("#### ✅ 세부 활동 체크리스트")
-                        with st.container(border=True):
-                            changed = False
-                            for idx, t in enumerate(tasks):
-                                is_done = st.checkbox(f"**{get_date_label(t)}{t['task']}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{u_idx}_{idx}")
-                                if is_done != t.get('done'): t['done'] = is_done; changed = True
-                                for s_idx, stask in enumerate(t.get('subtasks', [])):
-                                    col_empty, col_chk = st.columns([1, 20])
-                                    with col_chk:
-                                        sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"chk_sub_{search_name}_{data['program']}_{u_idx}_{idx}_{s_idx}")
-                                        if sub_done != stask.get('done'): stask['done'] = sub_done; changed = True
-                            if changed: 
-                                if save_data(db): st.rerun()
+                            st.write("#### ✅ 세부 활동 체크리스트")
+                            with st.container(border=True):
+                                changed = False
+                                for idx, t in enumerate(tasks):
+                                    is_done = st.checkbox(f"**{get_date_label(t)}{t['task']}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{u_idx}_{idx}")
+                                    if is_done != t.get('done'): t['done'] = is_done; changed = True
+                                    for s_idx, stask in enumerate(t.get('subtasks', [])):
+                                        col_empty, col_chk = st.columns([1, 20])
+                                        with col_chk:
+                                            sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"chk_sub_{search_name}_{data['program']}_{u_idx}_{idx}_{s_idx}")
+                                            if sub_done != stask.get('done'): stask['done'] = sub_done; changed = True
+                                if changed: 
+                                    if save_data(db): st.rerun()
 
-                        st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
-                        chat_box = st.container(border=True, height=250)
-                        with chat_box:
-                            if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
-                            for msg in data.get('messages', []):
-                                with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
-                        with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
-                            c1, c2 = st.columns([8, 2])
-                            msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
-                            if c2.form_submit_button("전송") and msg_input:
-                                data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
-                                if save_data(db): st.rerun()
+                            st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
+                            chat_box = st.container(border=True, height=250)
+                            with chat_box:
+                                if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
+                                for msg in data.get('messages', []):
+                                    with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
+                            with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
+                                c1, c2 = st.columns([8, 2])
+                                msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
+                                if c2.form_submit_button("전송") and msg_input:
+                                    data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
+                                    if save_data(db): st.rerun()
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
@@ -509,7 +610,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 # ✨ [신규 기능] 4개 차트 각각에 대한 지능형 텍스트 해석 리포트
                 # ==============================================================
                 
-                # 1. 상단 두 차트 (Bar, Box) 생성
                 fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                 ax1.set_title('Average Score by Program')
@@ -522,7 +622,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax2.tick_params(axis='x', rotation=45)
                 st.pyplot(fig1)
 
-                # 1-1. 차트 1 (Bar) 해석: 프로그램별 평균 성취도
                 st.markdown(f"**💡 [차트 1] 프로그램별 평균 성취도 해석**")
                 valid_scores = df_dash[df_dash['AvgScore'] > 0]
                 if valid_scores.empty or df_dash['AvgScore'].max() == 0:
@@ -536,7 +635,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_p}' 프로그램이 평균 {top_s:.1f}점으로 가장 우수한 성과를 보이고 있습니다.</div>" +
                                 (f"<div class='neg-text'>🔴 주의 요망: '{low_p}' 프로그램이 평균 {low_s:.1f}점으로 상대적으로 부진합니다. 점검이 필요합니다.</div></div>" if low_s < 60 else f"<div class='info-text'>ℹ️ 특이사항: 평균 60점 미만으로 심각하게 부진한 프로그램은 없습니다.</div></div>"), unsafe_allow_html=True)
                 
-                # 1-2. 차트 2 (Box) 해석: 이탈 위험 (이상치) 탐지
                 st.markdown(f"**💡 [차트 2] {T_USER} 성취도 분포 및 이탈 위험 탐지**")
                 if len(valid_scores) < 3 or df_dash['AvgScore'].max() == 0:
                     st.info(f"📉 **데이터 부족:** {T_USER} 표본이 부족하여 신뢰할 수 있는 이상치(Outlier)를 판별하기 어렵습니다.")
@@ -550,7 +648,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
 
                 st.divider()
 
-                # 2. 하단 두 차트 (Scatter, Hist) 생성
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
                 ax3.set_title('Teacher Comments vs Student Score')
@@ -562,7 +659,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
 
-                # 2-1. 차트 3 (Scatter) 해석: 코멘트-성취도 상관관계
                 st.markdown(f"**💡 [차트 3] {T_ADMIN} 관리 효율성 (피드백 효과) 분석**")
                 if df_dash['Comments'].sum() == 0 or len(valid_scores) < 3:
                     st.info(f"📉 **데이터 부족:** 작성된 코멘트(피드백)가 충분하지 않아 상관관계를 분석할 수 없습니다. {T_ADMIN}님들이 평가 시 코멘트를 적극적으로 남겨주시면 관리 효율성 파악이 가능합니다.")
@@ -577,7 +673,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     else:
                         st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 코멘트 양과 성취도 간에 뚜렷한 상관성(계수: {corr:.2f})은 나타나지 않고 고르게 분포되어 있습니다. 특정 {T_USER}에게 피드백이 편중되지 않았습니다.</div></div>", unsafe_allow_html=True)
 
-                # 2-2. 차트 4 (Hist) 해석: 전체 과업 난이도
                 st.markdown(f"**💡 [차트 4] 전체 커리큘럼(과업) 난이도 분포 분석**")
                 valid_tasks = df_tasks[df_tasks['Score'] > 0]
                 if valid_tasks.empty:
