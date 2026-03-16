@@ -168,19 +168,14 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                 tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
                 
-                # ✨ [복구 완료] 잃어버렸던 '전체 일정 요약 보기' 기능 부활!
                 grouped_tasks = defaultdict(list)
                 for role, tasks in prog.get('roles_workflow', {}).items():
                     for t in tasks:
                         label = get_date_label(t)
                         date_val = label if label else "일정 미정"
-                        
                         sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
-                        if sub_texts:
-                            task_display = f"{t['task']} <br><span style='color:gray;font-size:0.85em;'>└ {', '.join(sub_texts)}</span>"
-                        else:
-                            task_display = t['task']
-                            
+                        if sub_texts: task_display = f"{t['task']} <br><span style='color:gray;font-size:0.85em;'>└ {', '.join(sub_texts)}</span>"
+                        else: task_display = t['task']
                         grouped_tasks[date_val].append({"role": role, "task": task_display})
                 
                 if grouped_tasks:
@@ -198,13 +193,11 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                             html_table += f"<tr><td style='font-weight:bold;'>{d}</td>"
                             tasks_on_date = grouped_tasks[d]
                             for i in range(max_roles_in_a_day):
-                                if i < len(tasks_on_date):
-                                    html_table += f"<td>{tasks_on_date[i]['role']}</td><td class='task-content'>{tasks_on_date[i]['task']}</td>"
+                                if i < len(tasks_on_date): html_table += f"<td>{tasks_on_date[i]['role']}</td><td class='task-content'>{tasks_on_date[i]['task']}</td>"
                                 else: html_table += "<td></td><td></td>"
                             html_table += "</tr>"
                         html_table += "</table>"
                         st.markdown(html_table, unsafe_allow_html=True)
-                # ✨ (여기까지 복구 완료된 블록입니다)
 
                 st.write(f"**현재 참여 인원** ({total_curr}/{total_cap}명)")
                 st.progress(total_curr/total_cap if total_cap > 0 else 0)
@@ -214,7 +207,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2] 청소년/학부모 페이지 
+# [페이지 2] 청소년/학부모 페이지
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 및 성장 리포트")
@@ -319,7 +312,7 @@ elif st.session_state.menu_option == "나의 이야기":
                         st.write("#### 💬 1:1 비밀 소통 게시판")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
-                            if not data.get('messages'): st.info("아직 나문을 대화가 없습니다.")
+                            if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
                             for msg in data.get('messages', []):
                                 with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
                         with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
@@ -409,7 +402,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
-                st.info("💡 **원장님 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
 
         with tab_eval:
             st.subheader("📝 학생 종합 평가 및 코멘트 작성")
@@ -462,29 +454,88 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 st.download_button("📥 결과 엑셀(CSV) 다운로드", data=csv_data, file_name="명단.csv", mime="text/csv", type="primary")
             else: st.info("데이터가 없습니다.")
 
+        # ✨ [리뉴얼 완료] 출석 관리 탭 (일일 입력 + 대시보드 시각화 분리)
         with tab_attendance:
             st.subheader("✅ 프로그램별 출석 관리")
             if my_programs:
-                c1, c2 = st.columns([6, 4])
-                att_prog = c1.selectbox("📋 출석 체크 프로그램", my_programs)
-                att_date = c2.date_input("🗓️ 날짜 선택").strftime("%Y-%m-%d")
+                att_prog = st.selectbox("📋 출석 체크 프로그램", my_programs, key="att_prog_select")
                 pu = [(i, u) for i, u in enumerate(db['users']) if u['program'] == att_prog]
-                if pu:
-                    with st.form(f"att_form"):
-                        att_up = {}
-                        for idx, u in pu:
-                            curr_st = u.get('attendance', {}).get(att_date, {}).get('status', '출석')
-                            curr_nt = u.get('attendance', {}).get(att_date, {}).get('note', '')
+                
+                if not pu:
+                    st.warning("해당 프로그램에 신청한 학생이 없습니다.")
+                else:
+                    att_sub1, att_sub2 = st.tabs(["📅 일일 출석 입력", "📊 전체 출석 현황 & 시각화"])
+                    
+                    with att_sub1:
+                        att_date = st.date_input("🗓️ 출석을 기록할 날짜 선택").strftime("%Y-%m-%d")
+                        st.info(f"💡 선택하신 **{att_date}**의 출석을 입력합니다. 이미 기록된 내용이 있다면 아래에 표시됩니다.")
+                        
+                        with st.form(f"att_form"):
+                            att_up = {}
                             h1, h2, h3 = st.columns([3, 3, 4])
-                            h1.write(f"**{u.get('alias') or u['name']}**")
-                            ns = h2.selectbox("상태", ["출석", "지각", "결석", "병결"], index=0, key=f"s_{idx}", label_visibility="collapsed")
-                            nn = h3.text_input("비고", value=curr_nt, key=f"n_{idx}", label_visibility="collapsed")
-                            att_up[idx] = {"status": ns, "note": nn}
-                        if st.form_submit_button("저장", type="primary"):
-                            for idx, ad in att_up.items():
-                                if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
-                                db['users'][idx]['attendance'][att_date] = ad
-                            if save_data(db): st.success("저장 완료"); time.sleep(1); st.rerun()
+                            h1.write("**학생명 (역할)**")
+                            h2.write("**상태**")
+                            h3.write("**비고**")
+                            st.divider()
+                            
+                            for idx, u in pu:
+                                curr_st = u.get('attendance', {}).get(att_date, {}).get('status', '출석')
+                                curr_nt = u.get('attendance', {}).get(att_date, {}).get('note', '')
+                                c1, c2, c3 = st.columns([3, 3, 4])
+                                c1.write(f"**{u.get('alias') or u['name']}**\n<br><span style='color:gray; font-size:0.8em;'>{u['role']}</span>", unsafe_allow_html=True)
+                                ns = c2.selectbox("상태", ["출석", "지각", "결석", "병결"], index=["출석", "지각", "결석", "병결"].index(curr_st), key=f"s_{idx}", label_visibility="collapsed")
+                                nn = c3.text_input("비고", value=curr_nt, key=f"n_{idx}", label_visibility="collapsed")
+                                att_up[idx] = {"status": ns, "note": nn}
+                                
+                            st.write("")
+                            if st.form_submit_button("💾 출석 저장", type="primary", use_container_width=True):
+                                for idx, ad in att_up.items():
+                                    if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
+                                    db['users'][idx]['attendance'][att_date] = ad
+                                if save_data(db): 
+                                    st.success(f"{att_date} 출석 정보가 성공적으로 저장되었습니다!"); time.sleep(1); st.rerun()
+
+                    with att_sub2:
+                        st.markdown("#### 🔍 학생별 종합 출석부 및 시각화")
+                        att_records = []
+                        for i, u in pu:
+                            disp_name = u.get('alias') or u['name']
+                            for d_key, info in u.get('attendance', {}).items():
+                                att_records.append({
+                                    "학생명": f"{disp_name}({u['role']})",
+                                    "날짜": d_key,
+                                    "상태": info['status'],
+                                    "비고": info['note']
+                                })
+                        
+                        if att_records:
+                            df_att = pd.DataFrame(att_records)
+                            
+                            # 1. 일자별 출석부 (피벗 테이블)
+                            st.write("##### 📅 학생별 일자별 출석 상세")
+                            pivot_df = df_att.pivot(index='학생명', columns='날짜', values='상태').fillna('-')
+                            pivot_df = pivot_df.reindex(sorted(pivot_df.columns), axis=1) # 날짜순 정렬
+                            st.dataframe(pivot_df, use_container_width=True)
+                            
+                            # 2. 상태별 집계 및 시각화 (누적 막대 차트)
+                            st.write("##### 📊 학생별 누적 현황 시각화")
+                            agg_df = df_att.groupby(['학생명', '상태']).size().unstack(fill_value=0)
+                            for col in ['출석', '지각', '결석', '병결']:
+                                if col not in agg_df.columns: agg_df[col] = 0
+                            agg_df = agg_df[['출석', '지각', '결석', '병결']]
+                            
+                            fig_att, ax_att = plt.subplots(figsize=(12, 6))
+                            colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6']
+                            agg_df.plot(kind='bar', stacked=True, ax=ax_att, color=colors, edgecolor='white')
+                            ax_att.set_title('Overall Attendance Status per Student', pad=15, fontweight='bold')
+                            ax_att.set_ylabel('Days Count')
+                            ax_att.set_xlabel('')
+                            plt.xticks(rotation=45, ha='right')
+                            plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
+                            st.pyplot(fig_att)
+                            st.info("💡 **원장님 인사이트:** 빨간색(결석)이나 노란색(지각) 누적 비율이 높은 학생을 한눈에 식별하고 빠르게 학부모 면담을 진행할 수 있습니다.")
+                        else:
+                            st.info("아직 기록된 출석 데이터가 없습니다. [일일 출석 입력] 탭에서 먼저 출석을 기록해 주세요.")
 
         with tab_manage_users:
             if my_programs:
