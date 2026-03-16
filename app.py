@@ -66,7 +66,7 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* 사이드바 UI 커스텀 (메뉴 4개 컬러 배분) */
+    /* 사이드바 UI 커스텀 */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
@@ -129,18 +129,11 @@ def load_data():
                 if 'parents' not in data: data['parents'] = []
                 if 'settings' not in data: data['settings'] = {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
                 if 'terms' not in data['settings']: data['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}
-                # ✨ 신규: UI 텍스트 동적 설정 추가
                 if 'ui' not in data['settings']:
                     data['settings']['ui'] = {
-                        "brand_title": "Youth Canvas",
-                        "brand_subtitle": "청소년의 꿈을 그리는 공간",
-                        "menu1": "찾아보기 (탐색)",
-                        "menu2": "나의 이야기",
-                        "menu3": "👨‍👩‍👧 학부모 공간",
-                        "menu4": "관계자 외 출입금지",
-                        "page1_title": "✨ 지금 뜨고 있는 활동",
-                        "page2_title": "🙋 나의 활동 진행도",
-                        "page3_title": "🔒 관리자 전용 포털"
+                        "brand_title": "Youth Canvas", "brand_subtitle": "청소년의 꿈을 그리는 공간",
+                        "menu1": "찾아보기 (탐색)", "menu2": "나의 이야기", "menu3": "👨‍👩‍👧 학부모 공간", "menu4": "관계자 외 출입금지",
+                        "page1_title": "✨ 지금 뜨고 있는 활동", "page2_title": "🙋 나의 활동 진행도", "page3_title": "🔒 관리자 전용 포털"
                     }
                 return data
     except Exception as e: st.error(f"🚨 연결 오류: {e}")
@@ -168,7 +161,6 @@ T_PARENT = db['settings']['terms']['parent']
 
 UI = db['settings']['ui']
 
-# 메뉴 선택 안전장치 로직
 menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4']]
 if 'menu_option' not in st.session_state or st.session_state.menu_option not in menu_list: 
     st.session_state.menu_option = UI['menu1']
@@ -260,7 +252,7 @@ if st.session_state.menu_option == UI['menu1']:
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu2'])
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지 
+# [페이지 2-1] 청소년 전용 페이지
 # =========================================================
 elif st.session_state.menu_option == UI['menu2']:
     st.markdown(f"## {UI['page2_title']}")
@@ -359,20 +351,26 @@ elif st.session_state.menu_option == UI['menu2']:
                     df_summ = pd.DataFrame(summary_rows)
                     st.dataframe(df_summ, use_container_width=True, hide_index=True)
                     
+                    # ✨ 학생용 차트 분리 패널 적용
                     if not df_summ.empty:
-                        fig_summ, (ax_s1, ax_s2) = plt.subplots(1, 2, figsize=(15, 4))
-                        
-                        sns.barplot(data=df_summ, x='프로그램', y='진행률(%)', ax=ax_s1, palette='mako')
-                        ax_s1.set_title('My Program Completion Rate (%)')
-                        ax_s1.set_ylim(0, 100)
-                        ax_s1.tick_params(axis='x', rotation=15)
-                        
-                        sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
-                        ax_s2.set_title('My Average Score by Program')
-                        ax_s2.set_ylim(0, 100)
-                        ax_s2.tick_params(axis='x', rotation=15)
-                        
-                        st.pyplot(fig_summ)
+                        s_col1, s_col2 = st.columns(2)
+                        with s_col1:
+                            with st.container(border=True):
+                                st.markdown("##### 📊 진행률 (%)")
+                                fig_s1, ax_s1 = plt.subplots(figsize=(6, 4))
+                                sns.barplot(data=df_summ, x='프로그램', y='진행률(%)', ax=ax_s1, palette='mako')
+                                ax_s1.set_ylim(0, 100)
+                                ax_s1.tick_params(axis='x', rotation=15)
+                                st.pyplot(fig_s1)
+
+                        with s_col2:
+                            with st.container(border=True):
+                                st.markdown("##### 📊 평균 성취도 (점)")
+                                fig_s2, ax_s2 = plt.subplots(figsize=(6, 4))
+                                sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
+                                ax_s2.set_ylim(0, 100)
+                                ax_s2.tick_params(axis='x', rotation=15)
+                                st.pyplot(fig_s2)
                         
                     st.markdown("#### 💡 나의 종합 분석 리포트")
                     overall_pct = int((total_d_all / total_t_all) * 100) if total_t_all > 0 else 0
@@ -576,7 +574,6 @@ elif st.session_state.menu_option == UI['menu4']:
             
         tab_parent_title = f"👨‍👩‍👧 {T_PARENT} 계정"
         if is_super:
-            # ✨ 마스터에게만 UI 설정 탭 노출
             tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "📝 신규 개설", "🎨 화면 설정", "⚙️ 정보 수정", "🔐 계정 관리"]
         else:
             tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "⚙️ 정보 수정", "🔐 계정 관리"]
@@ -618,82 +615,104 @@ elif st.session_state.menu_option == UI['menu4']:
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-                sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
-                ax1.set_title('Average Score by Program')
-                ax1.set_ylim(0, 100)
-                ax1.tick_params(axis='x', rotation=45)
+                # ==============================================================
+                # ✨ [UI 개선] 차트와 해석이 분리된 카드형 컬럼 레이아웃 적용
+                # ==============================================================
                 
-                sns.boxplot(data=df_dash, x='Program', y='AvgScore', ax=ax2, palette='pastel')
-                ax2.set_title('Score Distribution & Outliers (Risk Detection)')
-                ax2.set_ylim(0, 100)
-                ax2.tick_params(axis='x', rotation=45)
-                st.pyplot(fig1)
-
-                st.markdown(f"**💡 [차트 1] 프로그램별 평균 성취도 해석**")
-                valid_scores = df_dash[df_dash['AvgScore'] > 0]
-                if valid_scores.empty or df_dash['AvgScore'].max() == 0:
-                    st.info(f"📉 **데이터 부족:** 아직 {T_ADMIN}의 평가가 입력되지 않았습니다. 평가가 누적되면 프로그램 간 성과 비교가 제공됩니다.")
-                else:
-                    top_p = valid_scores.groupby('Program')['AvgScore'].mean().idxmax()
-                    top_s = valid_scores.groupby('Program')['AvgScore'].mean().max()
-                    low_p = valid_scores.groupby('Program')['AvgScore'].mean().idxmin()
-                    low_s = valid_scores.groupby('Program')['AvgScore'].mean().min()
-                    
-                    st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_p}' 프로그램이 평균 {top_s:.1f}점으로 가장 우수한 성과를 보이고 있습니다.</div>" +
-                                (f"<div class='neg-text'>🔴 주의 요망: '{low_p}' 프로그램이 평균 {low_s:.1f}점으로 상대적으로 부진합니다. 점검이 필요합니다.</div></div>" if low_s < 60 else f"<div class='info-text'>ℹ️ 특이사항: 평균 60점 미만으로 심각하게 부진한 프로그램은 없습니다.</div></div>"), unsafe_allow_html=True)
+                # -------------------
+                # 상단 차트 1 & 2
+                # -------------------
+                dash_col1, dash_col2 = st.columns(2)
                 
-                st.markdown(f"**💡 [차트 2] {T_USER} 성취도 분포 및 이탈 위험 탐지**")
-                if len(valid_scores) < 3 or df_dash['AvgScore'].max() == 0:
-                    st.info(f"📉 **데이터 부족:** {T_USER} 표본이 부족하여 신뢰할 수 있는 이상치(Outlier)를 판별하기 어렵습니다.")
-                else:
-                    risk_users = valid_scores[valid_scores['AvgScore'] < 60]
-                    if risk_users.empty:
-                        st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 성취도가 60점 미만으로 심각하게 이탈한 {T_USER}이 발견되지 않았습니다. 전반적으로 훌륭하게 관리되고 있습니다.</div></div>", unsafe_allow_html=True)
-                    else:
-                        names = ", ".join(risk_users['Student'].tolist())
-                        st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 즉각 조치 요망: {names} {T_USER}의 성취도가 60점 미만으로 하위권에 머물러 있습니다 (우측 박스플롯 하단 점 확인). 이탈 방지를 위한 개별 상담이 필요합니다.</div></div>", unsafe_allow_html=True)
+                with dash_col1:
+                    with st.container(border=True):
+                        st.markdown(f"##### 📊 [차트 1] 프로그램별 평균 성취도")
+                        fig1, ax1 = plt.subplots(figsize=(7, 5))
+                        sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
+                        ax1.set_ylim(0, 100)
+                        ax1.tick_params(axis='x', rotation=45)
+                        st.pyplot(fig1)
 
-                st.divider()
-
-                fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
-                sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
-                ax3.set_title('Teacher Comments vs Student Score')
-                ax3.set_xlabel('Number of Comments Given')
-                ax3.set_ylabel('Average Score')
+                        valid_scores = df_dash[df_dash['AvgScore'] > 0]
+                        if valid_scores.empty or df_dash['AvgScore'].max() == 0:
+                            st.info(f"📉 **데이터 부족:** 아직 {T_ADMIN}의 평가가 충분히 입력되지 않았습니다.")
+                        else:
+                            top_p = valid_scores.groupby('Program')['AvgScore'].mean().idxmax()
+                            top_s = valid_scores.groupby('Program')['AvgScore'].mean().max()
+                            low_p = valid_scores.groupby('Program')['AvgScore'].mean().idxmin()
+                            low_s = valid_scores.groupby('Program')['AvgScore'].mean().min()
+                            
+                            st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_p}' 프로그램이 평균 {top_s:.1f}점으로 가장 우수한 성과를 보이고 있습니다.</div>" +
+                                        (f"<div class='neg-text'>🔴 주의 요망: '{low_p}' 프로그램이 평균 {low_s:.1f}점으로 상대적으로 부진합니다. 점검이 필요합니다.</div></div>" if low_s < 60 else f"<div class='info-text'>ℹ️ 특이사항: 평균 60점 미만으로 심각하게 부진한 프로그램은 없습니다.</div></div>"), unsafe_allow_html=True)
                 
-                sns.histplot(data=df_tasks, x='Score', bins=10, kde=True, ax=ax4, color='steelblue')
-                ax4.set_title('Distribution of All Task Scores (Difficulty)')
-                ax4.set_xlabel('Score')
-                st.pyplot(fig2)
+                with dash_col2:
+                    with st.container(border=True):
+                        st.markdown(f"##### 📊 [차트 2] {T_USER} 성취도 분포 및 이탈 위험 탐지")
+                        fig2, ax2 = plt.subplots(figsize=(7, 5))
+                        sns.boxplot(data=df_dash, x='Program', y='AvgScore', ax=ax2, palette='pastel')
+                        ax2.set_ylim(0, 100)
+                        ax2.tick_params(axis='x', rotation=45)
+                        st.pyplot(fig2)
 
-                st.markdown(f"**💡 [차트 3] {T_ADMIN} 관리 효율성 (피드백 효과) 분석**")
-                if df_dash['Comments'].sum() == 0 or len(valid_scores) < 3:
-                    st.info(f"📉 **데이터 부족:** 작성된 코멘트(피드백)가 충분하지 않아 상관관계를 분석할 수 없습니다. {T_ADMIN}님들이 평가 시 코멘트를 적극적으로 남겨주시면 관리 효율성 파악이 가능합니다.")
-                else:
-                    corr = df_dash['Comments'].corr(df_dash['AvgScore'])
-                    if pd.isna(corr):
-                        st.info("📉 **데이터 부족:** 변동성이 부족하여 상관계수를 도출할 수 없습니다.")
-                    elif corr >= 0.3:
-                        st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 코멘트 수와 성취도 간에 양의 상관관계(계수: {corr:.2f})가 존재합니다. {T_ADMIN}의 피드백이 {T_USER} 성취도 향상에 직접적인 도움을 주고 있습니다.</div></div>", unsafe_allow_html=True)
-                    elif corr <= -0.3:
-                        st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트 수와 성취도 간에 음의 상관관계(계수: {corr:.2f})가 관찰됩니다. 피드백이 잦은 {T_USER}일수록 성취도가 낮은 경향이 있으니, 피드백의 방식이나 내용 점검이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 코멘트 양과 성취도 간에 뚜렷한 상관성(계수: {corr:.2f})은 나타나지 않고 고르게 분포되어 있습니다. 특정 {T_USER}에게 피드백이 편중되지 않았습니다.</div></div>", unsafe_allow_html=True)
+                        if len(valid_scores) < 3 or df_dash['AvgScore'].max() == 0:
+                            st.info(f"📉 **데이터 부족:** {T_USER} 표본이 부족하여 신뢰할 수 있는 이상치(Outlier)를 판별하기 어렵습니다.")
+                        else:
+                            risk_users = valid_scores[valid_scores['AvgScore'] < 60]
+                            if risk_users.empty:
+                                st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 성취도가 60점 미만으로 심각하게 이탈한 {T_USER}이 발견되지 않았습니다. 전반적으로 훌륭하게 관리되고 있습니다.</div></div>", unsafe_allow_html=True)
+                            else:
+                                names = ", ".join(risk_users['Student'].tolist())
+                                st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 즉각 조치 요망: {names} {T_USER}의 성취도가 60점 미만으로 하위권에 머물러 있습니다. 이탈 방지를 위한 개별 상담이 필요합니다.</div></div>", unsafe_allow_html=True)
 
-                st.markdown(f"**💡 [차트 4] 전체 커리큘럼(과업) 난이도 분포 분석**")
-                valid_tasks = df_tasks[df_tasks['Score'] > 0]
-                if valid_tasks.empty:
-                    st.info(f"📉 **데이터 부족:** 세부 과업별 평가 점수가 입력되지 않아 분포를 그릴 수 없습니다.")
-                else:
-                    avg_task_score = valid_tasks['Score'].mean()
-                    hard_tasks = valid_tasks.groupby('Task')['Score'].mean()
-                    hardest_task = hard_tasks.idxmin()
-                    hardest_score = hard_tasks.min()
-                    
-                    pos_msg = f"<div class='pos-text'>🟢 긍정적 시그널: 전체 과업의 평균 달성도가 {avg_task_score:.1f}점으로 전반적으로 무난하고 적절한 난이도 수준을 유지하고 있습니다.</div>" if avg_task_score >= 70 else ""
-                    neg_msg = f"<div class='neg-text'>🔴 주의 요망: '{hardest_task}' 과업의 평균 점수가 {hardest_score:.1f}점으로 가장 낮습니다(왼쪽 쏠림 현상). 다음 회차 진행 시 해당 커리큘럼의 난이도 조절이나 추가 지원을 고려하세요.</div>" if hardest_score < 60 else f"<div class='info-text'>ℹ️ 특이사항: 현재 평균 60점 미만의 지나치게 어려운(난이도 조절 실패) 과업은 관찰되지 않았습니다.</div>"
-                    st.markdown(f"<div class='report-box'>{pos_msg}{neg_msg}</div>", unsafe_allow_html=True)
+                st.write("") # 간격 띄우기
+                
+                # -------------------
+                # 하단 차트 3 & 4
+                # -------------------
+                dash_col3, dash_col4 = st.columns(2)
+                
+                with dash_col3:
+                    with st.container(border=True):
+                        st.markdown(f"##### 📊 [차트 3] {T_ADMIN} 관리 효율성 (피드백 효과)")
+                        fig3, ax3 = plt.subplots(figsize=(7, 5))
+                        sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
+                        ax3.set_xlabel('Number of Comments Given')
+                        ax3.set_ylabel('Average Score')
+                        st.pyplot(fig3)
+
+                        if df_dash['Comments'].sum() == 0 or len(valid_scores) < 3:
+                            st.info(f"📉 **데이터 부족:** 작성된 코멘트(피드백)가 충분하지 않아 상관관계를 분석할 수 없습니다.")
+                        else:
+                            corr = df_dash['Comments'].corr(df_dash['AvgScore'])
+                            if pd.isna(corr):
+                                st.info("📉 **데이터 부족:** 변동성이 부족하여 상관계수를 도출할 수 없습니다.")
+                            elif corr >= 0.3:
+                                st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 코멘트 수와 성취도 간에 양의 상관관계(계수: {corr:.2f})가 존재합니다. {T_ADMIN}의 피드백이 {T_USER} 성취도 향상에 도움을 주고 있습니다.</div></div>", unsafe_allow_html=True)
+                            elif corr <= -0.3:
+                                st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트 수와 성취도 간에 음의 상관관계(계수: {corr:.2f})가 관찰됩니다. 피드백의 방식이나 내용 점검이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 코멘트 양과 성취도 간에 뚜렷한 상관성(계수: {corr:.2f})은 나타나지 않고 고르게 분포되어 있습니다. 피드백이 편중되지 않았습니다.</div></div>", unsafe_allow_html=True)
+
+                with dash_col4:
+                    with st.container(border=True):
+                        st.markdown(f"##### 📊 [차트 4] 전체 커리큘럼(과업) 난이도 분포")
+                        fig4, ax4 = plt.subplots(figsize=(7, 5))
+                        sns.histplot(data=df_tasks, x='Score', bins=10, kde=True, ax=ax4, color='steelblue')
+                        ax4.set_xlabel('Score')
+                        st.pyplot(fig4)
+
+                        valid_tasks = df_tasks[df_tasks['Score'] > 0]
+                        if valid_tasks.empty:
+                            st.info(f"📉 **데이터 부족:** 세부 과업별 평가 점수가 입력되지 않아 분포를 그릴 수 없습니다.")
+                        else:
+                            avg_task_score = valid_tasks['Score'].mean()
+                            hard_tasks = valid_tasks.groupby('Task')['Score'].mean()
+                            hardest_task = hard_tasks.idxmin()
+                            hardest_score = hard_tasks.min()
+                            
+                            pos_msg = f"<div class='pos-text'>🟢 긍정적 시그널: 전체 과업의 평균 달성도가 {avg_task_score:.1f}점으로 전반적으로 무난하고 적절한 난이도 수준을 유지하고 있습니다.</div>" if avg_task_score >= 70 else ""
+                            neg_msg = f"<div class='neg-text'>🔴 주의 요망: '{hardest_task}' 과업의 평균 점수가 {hardest_score:.1f}점으로 가장 낮습니다(왼쪽 쏠림 현상). 다음 회차 진행 시 해당 커리큘럼의 난이도 조절이나 추가 지원을 고려하세요.</div>" if hardest_score < 60 else f"<div class='info-text'>ℹ️ 특이사항: 현재 평균 60점 미만의 지나치게 어려운(난이도 조절 실패) 과업은 관찰되지 않았습니다.</div>"
+                            st.markdown(f"<div class='report-box'>{pos_msg}{neg_msg}</div>", unsafe_allow_html=True)
 
         with tab_eval:
             st.subheader(f"📝 {T_USER} 주차/과업별 달성도 및 코멘트 평가")
@@ -1105,7 +1124,6 @@ elif st.session_state.menu_option == UI['menu4']:
                         db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
                         if save_data(db): st.rerun()
 
-        # ✨ [신규 기능] 마스터 권한 전용 '화면 텍스트 맞춤 설정' 탭
         if is_super:
             with tab_ui:
                 st.subheader("🎨 화면 UI 및 텍스트 맞춤 설정")
@@ -1126,7 +1144,7 @@ elif st.session_state.menu_option == UI['menu4']:
                     
                     st.write("##### 3. 페이지별 최상단 메인 제목")
                     c7, c8, c9 = st.columns(3)
-                    new_p1 = c7.text_input("메뉴 1 페이지 제목", value=UI.get('page1_title', '✨ 지금 뜨고 있는 청소년 활동'))
+                    new_p1 = c7.text_input("메뉴 1 페이지 제목", value=UI.get('page1_title', '✨ 지금 뜨고 있는 활동'))
                     new_p2 = c8.text_input("메뉴 2 페이지 제목", value=UI.get('page2_title', '🙋 나의 활동 진행도'))
                     new_p3 = c9.text_input("메뉴 4 페이지 제목", value=UI.get('page3_title', '🔒 관리자 전용 포털'))
                     
@@ -1145,7 +1163,6 @@ elif st.session_state.menu_option == UI['menu4']:
                         if save_data(db):
                             st.success("화면 텍스트가 성공적으로 변경되었습니다!")
                             time.sleep(1)
-                            # 이름을 바꾸면 현재 메뉴에서 튕기지 않도록 안전하게 이동
                             st.session_state.menu_option = new_m4 
                             st.rerun()
 
