@@ -360,12 +360,25 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
         if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
-        tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_create, tab_edit, tab_settings = st.tabs([
-            "📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"
-        ])
+        # ✨ 권한에 따른 탭 동적 생성 (RBAC 적용 완료)
+        tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "⚙️ 정보 수정", "🔐 계정 관리"]
+        if is_super:
+            tab_titles.insert(5, "📝 신규 개설")
+        
+        tabs = st.tabs(tab_titles)
+        tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users = tabs[:5]
+        
+        if is_super:
+            tab_create, tab_edit, tab_settings = tabs[5:]
+        else:
+            tab_edit, tab_settings = tabs[5:]
         
         with tab_dashboard:
-            st.subheader("📈 학원장 전용 통합 경영 대시보드")
+            # ✨ 마스터/일반 강사에 따른 호칭 동적 변경
+            dashboard_title = "학원장 전용" if is_super else f"{admin_info['name']} 선생님 전용"
+            insight_caller = "원장님" if is_super else f"{admin_info['name']} 선생님"
+            
+            st.subheader(f"📈 {dashboard_title} 통합 경영 대시보드")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             
             if not users_to_show: st.info("데이터가 부족하여 대시보드를 생성할 수 없습니다.")
@@ -401,7 +414,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax2.set_ylim(0, 100)
                 ax2.tick_params(axis='x', rotation=45)
                 st.pyplot(fig1)
-                st.info("💡 **원장님 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
+                st.info(f"💡 **{insight_caller} 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
 
                 st.markdown("##### 🔍 강사 관리 효율성 및 과업 난이도 분석")
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
@@ -414,6 +427,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
+                st.info(f"💡 **{insight_caller} 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
 
         with tab_eval:
             st.subheader("📝 학생 종합 평가 및 코멘트 작성")
@@ -566,7 +580,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
                             st.pyplot(fig_att)
                             
-                            # ✨ [신규 추가] 이탈 위험 학생 자동 탐지 리포트
                             st.divider()
                             st.markdown("#### 🚨 이탈 위험 학생 자동 리포트 (경고 시스템)")
                             threshold = st.slider("⚠️ 위험 기준 설정 (결석+지각 누적 비율 %)", min_value=10, max_value=100, value=30, step=5)
@@ -676,35 +689,37 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
-        with tab_create:
-            with st.form("create_form"):
-                c1, c2 = st.columns([8, 2])
-                t = c1.text_input("프로그램 명")
-                color = c2.color_picker("색상", "#4f46e5")
-                col_rs, col_re = st.columns(2) 
-                r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
-                d = st.text_area("소개"); v = st.text_input("유튜브 링크")
-                w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
-                
-                if st.form_submit_button("개설하기", type="primary"):
-                    pw = {}; pc = {}; cr = None
-                    for line in w_input.split('\n'):
-                        line = line.strip()
-                        if not line: continue
-                        if line.startswith('[') and ']' in line:
-                            cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
-                            pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
-                            pw[cr] = []
-                        elif cr and ':' in line and not line.startswith('-'):
-                            dt, tk = line.split(':', 1)
-                            sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
-                            pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
-                        elif cr and line.startswith('-'):
-                            if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
-                    db['programs'].append({"title": t, "desc": d, "video": v, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
-                    if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
-                    if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
-                    else: db['programs'].pop()
+        # ✨ 일반 관리자에게는 숨겨지는 탭 1 (신규 개설)
+        if is_super:
+            with tab_create:
+                with st.form("create_form"):
+                    c1, c2 = st.columns([8, 2])
+                    t = c1.text_input("프로그램 명")
+                    color = c2.color_picker("색상", "#4f46e5")
+                    col_rs, col_re = st.columns(2) 
+                    r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
+                    d = st.text_area("소개"); v = st.text_input("유튜브 링크")
+                    w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
+                    
+                    if st.form_submit_button("개설하기", type="primary"):
+                        pw = {}; pc = {}; cr = None
+                        for line in w_input.split('\n'):
+                            line = line.strip()
+                            if not line: continue
+                            if line.startswith('[') and ']' in line:
+                                cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
+                                pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
+                                pw[cr] = []
+                            elif cr and ':' in line and not line.startswith('-'):
+                                dt, tk = line.split(':', 1)
+                                sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
+                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                            elif cr and line.startswith('-'):
+                                if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
+                        db['programs'].append({"title": t, "desc": d, "video": v, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
+                        if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
+                        if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
+                        else: db['programs'].pop()
 
         with tab_edit:
             if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
