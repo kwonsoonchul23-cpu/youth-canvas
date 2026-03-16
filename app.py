@@ -121,9 +121,11 @@ def load_data():
             data = response.json()
             if data and isinstance(data, dict) and 'programs' in data: 
                 if 'parents' not in data: data['parents'] = []
+                if 'settings' not in data: data['settings'] = {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
+                if 'terms' not in data['settings']: data['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}
                 return data
     except Exception as e: st.error(f"🚨 연결 오류: {e}")
-    return {"programs": [], "users": [], "parents": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}}
+    return {"programs": [], "users": [], "parents": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31", "terms": {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}}}
 
 def save_data(data):
     try:
@@ -135,14 +137,23 @@ def save_data(data):
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
-if 'parents' not in db: db['parents'] = [] 
+
+# ✨ 용어(Terminology) 변수 전역 설정
+if 'settings' not in db: db['settings'] = {}
+if 'terms' not in db['settings']: db['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "user": "학생", "parent": "학부모"}
+T_SUPER = db['settings']['terms']['super']
+T_ADMIN = db['settings']['terms']['admin']
+T_USER = db['settings']['terms']['user']
+T_PARENT = db['settings']['terms']['parent']
+
+MENU_PARENT = f"👨‍👩‍👧 {T_PARENT} 공간"
 
 if 'menu_option' not in st.session_state: st.session_state.menu_option = "찾아보기 (탐색)"
 def change_page(page_name): st.session_state.menu_option = page_name; st.rerun()
 
 with st.sidebar:
     st.markdown("<div style='margin-bottom: 2rem; padding: 0 10px;'><div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div><div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div></div>", unsafe_allow_html=True)
-    menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", "👨‍👩‍👧 학부모 공간", "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", "👨‍👩‍👧 학부모 공간", "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
+    menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", MENU_PARENT, "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", MENU_PARENT, "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
     st.write(""); st.write("")
     if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
         st.session_state['db'] = load_data(); st.toast("✅ 동기화 완료!"); time.sleep(1); st.rerun()
@@ -152,7 +163,7 @@ st.session_state.menu_option = menu
 # [페이지 1] 메인 대시보드
 # =========================================================
 if st.session_state.menu_option == "찾아보기 (탐색)":
-    st.markdown("## ✨ 지금 뜨고 있는 청소년 활동")
+    st.markdown(f"## ✨ 지금 뜨고 있는 활동")
     st.write("") 
     if not db['programs']: st.info("아직 개설된 프로그램이 없습니다. 관리자 페이지에서 프로그램을 만들어주세요.")
         
@@ -224,7 +235,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지 (학생용 탭)
+# [페이지 2-1] 청소년 전용 페이지 
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 진행도")
@@ -240,7 +251,7 @@ elif st.session_state.menu_option == "나의 이야기":
                 default_idx = active_programs.index(st.session_state['selected_prog_from_main']) if 'selected_prog_from_main' in st.session_state and st.session_state['selected_prog_from_main'] in active_programs else 0
                 with st.container(border=True):
                     colA, colB = st.columns(2)
-                    user_name = colA.text_input("이름 (실명 입력)")
+                    user_name = colA.text_input(f"{T_USER} 이름 (실명 입력)")
                     user_pin = colB.text_input("나만의 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
                     selected_prog_title = st.selectbox("참여할 프로그램", active_programs, index=default_idx)
                     selected_prog_data = next(p for p in db['programs'] if p['title'] == selected_prog_title)
@@ -270,7 +281,7 @@ elif st.session_state.menu_option == "나의 이야기":
     with tab2:
         with st.container(border=True):
             col_id, col_pw, col_btn = st.columns([4, 4, 2])
-            search_name = col_id.text_input("이름", placeholder="예: 권해리")
+            search_name = col_id.text_input(f"{T_USER} 이름", placeholder="예: 권해리")
             search_pin = col_pw.text_input("비밀번호 (4자리)", type="password")
             login_attempt = col_btn.button("접속하기", use_container_width=True)
             
@@ -307,8 +318,7 @@ elif st.session_state.menu_option == "나의 이야기":
                             if changed: 
                                 if save_data(db): st.rerun()
 
-                        # ✨ 학생용 채팅방 (messages 사용)
-                        st.write("#### 💬 선생님과 1:1 비밀 소통 게시판 (학생 전용)")
+                        st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
                             if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -323,16 +333,16 @@ elif st.session_state.menu_option == "나의 이야기":
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# ✨ [페이지 2-2] 학부모 전용 라운지 (채팅 완전 분리)
+# [페이지 2-2] 학부모 전용 라운지
 # =========================================================
-elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
-    st.markdown("## 👨‍👩‍👧 학부모 전용 라운지")
-    st.caption("발급받으신 개별 학부모 계정으로 로그인하여 자녀의 성장 기록과 커리큘럼을 확인하세요.")
+elif st.session_state.menu_option == MENU_PARENT:
+    st.markdown(f"## 👨‍👩‍👧 {T_PARENT} 전용 라운지")
+    st.caption(f"발급받으신 개별 {T_PARENT} 계정으로 로그인하여 자녀의 성장 기록과 커리큘럼을 확인하세요.")
     
     with st.container(border=True):
         col_id, col_pw, col_btn = st.columns([4, 4, 2])
-        parent_name = col_id.text_input("학부모 성함", placeholder="예: 권해리 어머니")
-        parent_pin = col_pw.text_input("학부모 전용 비밀번호 (4자리)", type="password")
+        parent_name = col_id.text_input(f"{T_PARENT} 성함", placeholder="예: 권해리 어머니")
+        parent_pin = col_pw.text_input(f"{T_PARENT} 전용 비밀번호 (4자리)", type="password")
         login_attempt = col_btn.button("로그인", use_container_width=True)
         
         if login_attempt or (parent_name and parent_pin):
@@ -344,7 +354,7 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                 linked_students = p_info.get('linked_students', [])
                 
                 if not linked_students:
-                    st.info("아직 연결된 자녀(학생) 정보가 없습니다. 기관(학원)에 문의해주세요.")
+                    st.info(f"아직 연결된 정보가 없습니다. 기관에 문의해주세요.")
                 else:
                     child_tabs = st.tabs([f"👦👧 {s['name']} ({s['program']})" for s in linked_students])
                     
@@ -358,10 +368,10 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                 
                                 prog_data = next((p for p in db['programs'] if p['title'] == s_record['program']), None)
                                 if prog_data:
-                                    with st.expander("📚 [열람] 학원 프로그램 전체 커리큘럼 보기"):
+                                    with st.expander(f"📚 [열람] 프로그램 전체 커리큘럼 보기"):
                                         st.write(f"**프로그램 소개:** {prog_data['desc']}")
                                         st.divider()
-                                        st.write(f"**자녀 담당 역할 ({s_record['role']}) 상세 일정:**")
+                                        st.write(f"**담당 역할 ({s_record['role']}) 상세 일정:**")
                                         for t in prog_data.get('roles_workflow', {}).get(s_record['role'], []):
                                             st.write(f"🔹 **{get_date_label(t)}{t['task']}**")
                                             for stask in t.get('subtasks', []):
@@ -381,13 +391,13 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                 
                                 colR1, colR2 = st.columns(2)
                                 colR1.metric("세부 목표 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
-                                colR2.metric("선생님 종합 성취도 평가", f"{int(avg_score)}점", "100점 만점 기준")
+                                colR2.metric(f"{T_ADMIN} 종합 성취도 평가", f"{int(avg_score)}점", "100점 만점 기준")
                                 
                                 if task_scores:
                                     df_scores = pd.DataFrame({"성취도 점수": task_scores}, index=task_names)
                                     st.line_chart(df_scores, color="#e68128", height=200)
 
-                                st.markdown("#### 💌 선생님의 따뜻한 알림장")
+                                st.markdown(f"#### 💌 {T_ADMIN}의 따뜻한 알림장")
                                 has_comments = False
                                 for t in tasks:
                                     if t.get('comment'):
@@ -405,8 +415,7 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                             with col_chk:
                                                 st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"p_chk_sub_{s_record['name']}_{idx}_{t_idx}_{s_idx}", disabled=True)
                                 
-                                # ✨ 학부모 전용 채팅방 (학생의 채팅과 완전 분리)
-                                st.write("#### 💬 선생님께 메시지 보내기 (학생 비공개)")
+                                st.write(f"#### 💬 {T_ADMIN}께 메시지 보내기 ({T_USER} 비공개)")
                                 chat_box = st.container(border=True, height=250)
                                 with chat_box:
                                     if not s_record.get('parent_messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -419,7 +428,7 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                         s_record.setdefault('parent_messages', []).append({"sender": "user", "content": f"[{p_info['name']}] {msg_input}"})
                                         if save_data(db): st.rerun()
                             else:
-                                st.error(f"[{s_info['name']}] 학생의 데이터를 찾을 수 없습니다. 프로그램이 종료되었거나 이름이 변경되었을 수 있습니다.")
+                                st.error(f"[{s_info['name']}] 데이터를 찾을 수 없습니다.")
             else:
                 st.error("이름과 비밀번호가 일치하지 않습니다.")
 
@@ -448,10 +457,11 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
         if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
+        tab_parent_title = f"👨‍👩‍👧 {T_PARENT} 계정"
         if is_super:
-            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "👨‍👩‍👧 학부모 계정", "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"]
+            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"]
         else:
-            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "👨‍👩‍👧 학부모 계정", "⚙️ 정보 수정", "🔐 계정 관리"]
+            tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "⚙️ 정보 수정", "🔐 계정 관리"]
 
         tabs = st.tabs(tab_titles)
         tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents = tabs[:6]
@@ -462,8 +472,8 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
             tab_edit, tab_settings = tabs[6:]
         
         with tab_dashboard:
-            dashboard_title = "학원장 전용" if is_super else f"{admin_info['name']} 선생님 전용"
-            insight_caller = "원장님" if is_super else f"{admin_info['name']} 선생님"
+            dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
+            insight_caller = T_SUPER if is_super else f"{admin_info['name']} {T_ADMIN}"
             
             st.subheader(f"📈 {dashboard_title} 통합 경영 대시보드")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
@@ -496,26 +506,26 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     top_score = df_dash.groupby('Program')['AvgScore'].mean().max()
                     
                     pos_text = f"**[긍정적 시그널 🟢]**\n"
-                    pos_text += f"- **우수 프로그램:** '{top_prog}' 프로그램이 평균 성취도 {top_score:.1f}점으로 가장 훌륭한 학업 성과를 내고 있습니다.\n"
+                    pos_text += f"- **우수 프로그램:** '{top_prog}' 프로그램이 평균 성취도 {top_score:.1f}점으로 가장 훌륭한 성과를 내고 있습니다.\n"
                     
                     corr = df_dash['Comments'].corr(df_dash['AvgScore'])
                     if pd.notna(corr) and corr > 0.3:
-                        pos_text += f"- **피드백 효과:** 선생님의 코멘트 수와 학생 성취도 간에 긍정적인 상관관계(계수: {corr:.2f})가 확인되었습니다. 선생님의 관심이 성적 향상으로 직결되고 있습니다.\n"
+                        pos_text += f"- **피드백 효과:** {T_ADMIN}의 코멘트 수와 성취도 간에 긍정적인 상관관계(계수: {corr:.2f})가 확인되었습니다.\n"
                     st.success(pos_text)
                     
                     neg_text = f"**[주의 및 개선 필요 🔴]**\n"
                     low_students = df_dash[df_dash['AvgScore'] < 60]
                     if not low_students.empty:
                         names = ", ".join(low_students['Student'].tolist())
-                        neg_text += f"- **성취도 부진 학생:** {names} 학생의 평균 성취도가 60점 미만입니다. 빠른 개별 면담과 학습 독려가 필요합니다.\n"
+                        neg_text += f"- **성취도 부진 {T_USER}:** {names} {T_USER}의 평균 성취도가 60점 미만입니다. 빠른 개별 면담이 필요합니다.\n"
                     else:
-                        neg_text += f"- **이탈 위험 점검:** 현재 성취도가 심각하게 낮은(60점 미만) 이탈 위험 학생은 없습니다. 훌륭하게 관리되고 있습니다.\n"
+                        neg_text += f"- **이탈 위험 점검:** 현재 성취도가 심각하게 낮은 이탈 위험 {T_USER}은 없습니다. 훌륭하게 관리되고 있습니다.\n"
                         
                     if not df_tasks.empty:
                         hard_task = df_tasks.groupby('Task')['Score'].mean().idxmin()
                         hard_score = df_tasks.groupby('Task')['Score'].mean().min()
                         if hard_score < 70:
-                            neg_text += f"- **커리큘럼 난이도 점검:** '{hard_task}' 주차/과업의 평균 점수가 {hard_score:.1f}점으로 전체 중 가장 낮습니다. 학생들에게 난이도가 높을 수 있으니 세부 내용이나 진도를 조율해 보세요.\n"
+                            neg_text += f"- **커리큘럼 난이도 점검:** '{hard_task}' 주차/과업의 평균 점수가 {hard_score:.1f}점으로 전체 중 가장 낮습니다. 난이도를 조율해 보세요.\n"
                     st.error(neg_text)
                     st.divider()
 
@@ -531,9 +541,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax2.set_ylim(0, 100)
                 ax2.tick_params(axis='x', rotation=45)
                 st.pyplot(fig1)
-                st.info(f"💡 **{insight_caller} 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
+                st.info(f"💡 **{insight_caller} 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 {T_USER}(이상치)'**입니다. 개별 면담이 필요합니다.")
 
-                st.markdown("##### 🔍 강사 관리 효율성 및 과업 난이도 분석")
+                st.markdown(f"##### 🔍 {T_ADMIN} 관리 효율성 및 과업 난이도 분석")
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
                 ax3.set_title('Teacher Comments vs Student Score')
@@ -546,21 +556,21 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 st.pyplot(fig2)
 
         with tab_eval:
-            st.subheader("📝 학생 주차/과업별 달성도 및 코멘트 평가")
+            st.subheader(f"📝 {T_USER} 주차/과업별 달성도 및 코멘트 평가")
             if not my_programs: st.info("담당 프로그램이 없습니다.")
             else:
                 col_sel1, col_sel2 = st.columns([5, 5])
                 eval_prog = col_sel1.selectbox("📋 프로그램 선택", my_programs, key="eval_prog")
                 prog_users = [(i, u) for i, u in enumerate(db['users']) if u['program'] == eval_prog]
                 
-                if not prog_users: st.warning("신청한 학생이 없습니다.")
+                if not prog_users: st.warning(f"신청한 {T_USER}이 없습니다.")
                 else:
                     eval_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in prog_users}
-                    selected_user_label = col_sel2.selectbox("🎓 학생 선택", list(eval_user_options.keys()))
+                    selected_user_label = col_sel2.selectbox(f"🎓 {T_USER} 선택", list(eval_user_options.keys()))
                     target_idx = eval_user_options[selected_user_label]
                     target_user = db['users'][target_idx]
                     
-                    st.write(f"#### 🏅 {target_user['name']} 학생 평가 입력")
+                    st.write(f"#### 🏅 {target_user['name']} {T_USER} 평가 입력")
                     st.info("💡 각 주차(과업)의 세부 내용을 확인하시고, 이를 종합하여 성취도 점수와 피드백 코멘트를 남겨주세요.")
                     
                     with st.form(f"eval_form_{target_idx}"):
@@ -573,7 +583,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             
                             c1, c2 = st.columns([3, 7])
                             new_score = c1.slider("해당 주차 종합 성취도 점수", 0, 100, t.get('score', 0), key=f"score_{target_idx}_{t_idx}")
-                            new_comment = c2.text_input("학부모 전송용 코멘트", value=t.get('comment', ''), placeholder="이 주차의 세부 목표 달성도에 대한 칭찬이나 아쉬운 점을 적어주세요.", key=f"comment_{target_idx}_{t_idx}")
+                            new_comment = c2.text_input(f"{T_PARENT} 전송용 코멘트", value=t.get('comment', ''), placeholder="이 주차의 세부 목표 달성도에 대한 칭찬이나 아쉬운 점을 적어주세요.", key=f"comment_{target_idx}_{t_idx}")
                             st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
                             
                             target_user['workflow'][t_idx]['score'] = new_score
@@ -581,7 +591,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             
                         if st.form_submit_button("💾 전체 평가 저장하기", type="primary", use_container_width=True):
                             if save_data(db):
-                                st.success("학생 평가와 코멘트가 저장되어 학부모 리포트에 반영되었습니다!")
+                                st.success("평가와 코멘트가 저장되어 리포트에 반영되었습니다!")
                                 time.sleep(1)
                                 st.rerun()
 
@@ -595,10 +605,10 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
                     att_counts = sum(1 for v in u.get('attendance', {}).values() if v.get('status') == '출석')
                     overview_data.append({
-                        "학생명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
+                        f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
                         "평균성취도(점)": pct, "총 출석(일)": att_counts
                     })
-                df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", "학생명"])
+                df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
                 fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
@@ -636,7 +646,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 pu = [(i, u) for i, u in enumerate(db['users']) if u['program'] == att_prog]
                 
                 if not pu:
-                    st.warning("해당 프로그램에 신청한 학생이 없습니다.")
+                    st.warning(f"해당 프로그램에 신청한 {T_USER}이 없습니다.")
                 else:
                     att_sub1, att_sub2, att_sub3 = st.tabs(["📅 일일 출석 입력", "📊 전체 출석 현황 & 시각화", "✏️ 개별 기록 수정/삭제"])
                     
@@ -671,7 +681,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         with st.form(f"att_form"):
                             att_up = {}
                             h1, h2, h3 = st.columns([3, 3, 4])
-                            h1.write("**학생명 (역할)**")
+                            h1.write(f"**{T_USER}명 (역할)**")
                             h2.write("**상태**")
                             h3.write("**비고**")
                             st.divider()
@@ -694,13 +704,13 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                     st.success(f"{att_date} 출석 정보가 성공적으로 저장되었습니다!"); time.sleep(1); st.rerun()
 
                     with att_sub2:
-                        st.markdown("#### 🔍 학생별 종합 출석부 및 시각화")
+                        st.markdown(f"#### 🔍 {T_USER}별 종합 출석부 및 시각화")
                         att_records = []
                         for i, u in pu:
                             disp_name = u.get('alias') or u['name']
                             for d_key, info in u.get('attendance', {}).items():
                                 att_records.append({
-                                    "학생명": f"{disp_name}({u['role']})",
+                                    f"{T_USER}명": f"{disp_name}({u['role']})",
                                     "날짜": d_key,
                                     "상태": info['status'],
                                     "비고": info['note']
@@ -708,13 +718,13 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         
                         if att_records:
                             df_att = pd.DataFrame(att_records)
-                            st.write("##### 📅 학생별 일자별 출석 상세")
-                            pivot_df = df_att.pivot(index='학생명', columns='날짜', values='상태').fillna('-')
+                            st.write(f"##### 📅 {T_USER}별 일자별 출석 상세")
+                            pivot_df = df_att.pivot(index=f"{T_USER}명", columns='날짜', values='상태').fillna('-')
                             pivot_df = pivot_df.reindex(sorted(pivot_df.columns), axis=1) 
                             st.dataframe(pivot_df, use_container_width=True)
                             
-                            st.write("##### 📊 학생별 누적 현황 시각화")
-                            agg_df = df_att.groupby(['학생명', '상태']).size().unstack(fill_value=0)
+                            st.write(f"##### 📊 {T_USER}별 누적 현황 시각화")
+                            agg_df = df_att.groupby([f"{T_USER}명", '상태']).size().unstack(fill_value=0)
                             for col in ['출석', '지각', '결석', '병결']:
                                 if col not in agg_df.columns: agg_df[col] = 0
                             agg_df = agg_df[['출석', '지각', '결석', '병결']]
@@ -730,7 +740,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             st.pyplot(fig_att)
                             
                             st.divider()
-                            st.markdown("#### 🚨 이탈 위험 학생 자동 리포트 (경고 시스템)")
+                            st.markdown(f"#### 🚨 이탈 위험 {T_USER} 자동 리포트 (경고 시스템)")
                             threshold = st.slider("⚠️ 위험 기준 설정 (결석+지각 누적 비율 %)", min_value=10, max_value=100, value=30, step=5)
                             
                             risk_reports = []
@@ -741,12 +751,12 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                     bad_ratio = (bad_days / total_days) * 100
                                     
                                     if bad_ratio >= threshold:
-                                        student_records = df_att[df_att['학생명'] == student_name]
+                                        student_records = df_att[df_att[f'{T_USER}명'] == student_name]
                                         recent_notes = student_records[student_records['비고'] != '']['비고'].tail(3).tolist()
                                         note_str = ", ".join(recent_notes) if recent_notes else "특이사항 없음"
                                         
                                         risk_reports.append({
-                                            "학생명": student_name,
+                                            f"{T_USER}명": student_name,
                                             "위험 지수": f"{bad_ratio:.1f}%",
                                             "총 기록일": total_days,
                                             "결석": row['결석'],
@@ -755,37 +765,36 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                         })
                             
                             if risk_reports:
-                                st.error(f"**주의 요망!** 설정하신 기준({threshold}%)을 초과하여 집중 관리가 필요한 학생이 {len(risk_reports)}명 있습니다.")
+                                st.error(f"**주의 요망!** 설정하신 기준({threshold}%)을 초과하여 집중 관리가 필요한 {T_USER}이 {len(risk_reports)}명 있습니다.")
                                 df_risk = pd.DataFrame(risk_reports)
                                 st.dataframe(df_risk, use_container_width=True, hide_index=True)
                                 
-                                report_text = f"단기 이탈 위험 학생 리포트 (기준: 결석/지각 {threshold}% 이상)\n"
+                                report_text = f"단기 이탈 위험 {T_USER} 리포트 (기준: 결석/지각 {threshold}% 이상)\n"
                                 report_text += "=" * 40 + "\n"
                                 for r in risk_reports:
-                                    report_text += f"👤 {r['학생명']}\n"
+                                    report_text += f"👤 {r[f'{T_USER}명']}\n"
                                     report_text += f" - 위험 지수: {r['위험 지수']} (총 {r['총 기록일']}일 중 결석 {r['결석']}일, 지각 {r['지각']}일)\n"
                                     report_text += f" - 최근 비고: {r['최근 비고']}\n\n"
                                 
-                                with st.expander("📄 텍스트 리포트 복사하기 (학부모 상담/원장 보고용)"):
+                                with st.expander("📄 텍스트 리포트 복사하기"):
                                     st.text_area("아래 내용을 복사하여 카카오톡이나 보고서에 바로 활용하세요.", value=report_text, height=200)
                             else:
-                                st.success(f"현재 결석/지각 비율이 {threshold}% 이상인 이탈 위험 학생이 없습니다. 아주 잘 관리되고 있습니다!")
+                                st.success(f"현재 결석/지각 비율이 {threshold}% 이상인 이탈 위험 {T_USER}이 없습니다. 아주 잘 관리되고 있습니다!")
                                 
                         else:
                             st.info("아직 기록된 출석 데이터가 없습니다. [일일 출석 입력] 탭에서 먼저 출석을 기록해 주세요.")
                             
                     with att_sub3:
-                        st.markdown("#### ✏️ 개별 학생 출석 기록 수정 및 삭제")
-                        st.info("특정 학생의 잘못 입력된 과거 출석 기록을 개별적으로 수정하거나 아예 지울 수 있습니다.")
+                        st.markdown(f"#### ✏️ 개별 {T_USER} 출석 기록 수정 및 삭제")
                         
                         att_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
-                        selected_user_label = st.selectbox("🎓 수정할 학생 선택", list(att_user_options.keys()), key="att_edit_user")
+                        selected_user_label = st.selectbox(f"🎓 수정할 {T_USER} 선택", list(att_user_options.keys()), key="att_edit_user")
                         target_idx = att_user_options[selected_user_label]
                         target_user = db['users'][target_idx]
                         
                         att_history = target_user.get('attendance', {})
                         if not att_history:
-                            st.warning("이 학생은 아직 기록된 출석 데이터가 없습니다.")
+                            st.warning(f"이 {T_USER}은 아직 기록된 출석 데이터가 없습니다.")
                         else:
                             sorted_dates = sorted(list(att_history.keys()), reverse=True)
                             selected_date = st.selectbox("🗓️ 수정/삭제할 날짜 선택", sorted_dates, key="att_edit_date")
@@ -822,46 +831,44 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 pu = [(i, u) for i, u in enumerate(db['users']) if u['program'] == sel_p]
                 if pu:
                     ops = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
-                    t_idx = ops[st.selectbox("학생 선택", list(ops.keys()))]
+                    t_idx = ops[st.selectbox(f"{T_USER} 선택", list(ops.keys()))]
                     tu = db['users'][t_idx]
                     
                     with st.container(border=True):
-                        # ✨ 토글 버튼으로 관리자(선생님)가 학생 대화와 학부모 대화를 선택해서 볼 수 있게 기능 추가!
-                        chat_target = st.radio("💬 대화 상대 선택", ["👦 학생과 대화", "👨‍👩‍👧 학부모와 대화"], horizontal=True)
-                        msg_key = 'messages' if chat_target == "👦 학생과 대화" else 'parent_messages'
+                        # ✨ 채팅 분리 및 동적 용어 적용
+                        chat_target = st.radio("💬 대화 상대 선택", [f"👦 {T_USER}과 대화", f"👨‍👩‍👧 {T_PARENT}와 대화"], horizontal=True)
+                        msg_key = 'messages' if chat_target == f"👦 {T_USER}과 대화" else 'parent_messages'
                         
                         st.divider()
                         if not tu.get(msg_key): st.info("아직 나눈 대화가 없습니다.")
                         for msg in tu.get(msg_key, []):
                             with st.chat_message("assistant" if msg['sender'] == 'admin' else "user"): st.write(msg['content'])
                         
-                        # ✨ form의 key 값에 msg_key를 추가하여 에러 방지 및 완벽 분리
                         with st.form(f"adm_chat_{t_idx}_{msg_key}", clear_on_submit=True):
                             c1, c2 = st.columns([8, 2])
                             ri = c1.text_input("답장", label_visibility="collapsed")
                             if c2.form_submit_button("전송") and ri:
                                 tu.setdefault(msg_key, []).append({"sender": "admin", "content": ri})
                                 if save_data(db): st.rerun()
-                    if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
+                    if st.button(f"❌ {T_USER} 강제 퇴소(삭제)", type="primary"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
-        # ✨ [학부모 목록 UI 개편] 정신없는 표 대신 아코디언(expander) 스타일로 깔끔하게 정리
         with tab_parents:
-            st.subheader("👨‍👩‍👧 학부모 계정 발급 및 학생 연결")
-            st.info("💡 학부모님 전용 계정을 만들고, 해당 계정으로 열람할 수 있는 자녀(학생)를 선택해 연결합니다. (어머니/아버지 개별 발급 가능)")
+            st.subheader(f"👨‍👩‍👧 {T_PARENT} 계정 발급 및 연결")
+            st.info(f"💡 {T_PARENT} 전용 계정을 만들고, 열람할 수 있는 대상을 선택해 연결합니다.")
             
             if not my_programs:
-                st.warning("담당 중인 프로그램이 없어 학생을 연결할 수 없습니다.")
+                st.warning("담당 중인 프로그램이 없습니다.")
             else:
                 with st.form("parent_create_form"):
                     col1, col2 = st.columns(2)
-                    p_name = col1.text_input("학부모 이름 (예: 권해리 어머니)")
-                    p_pin = col2.text_input("학부모용 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
+                    p_name = col1.text_input(f"{T_PARENT} 이름 (예: 권해리 어머니)")
+                    p_pin = col2.text_input(f"{T_PARENT}용 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
                     
                     all_students = [f"{u['name']} - {u['program']} ({u['role']})" for u in db['users'] if u['program'] in my_programs]
-                    linked_sts = st.multiselect("이 학부모 계정과 연결할 자녀(학생) 선택 (다둥이 다중 선택 가능)", all_students)
+                    linked_sts = st.multiselect(f"이 계정과 연결할 {T_USER} 선택 (다중 선택 가능)", all_students)
                     
-                    if st.form_submit_button("학부모 계정 발급 및 연결", type="primary"):
+                    if st.form_submit_button(f"{T_PARENT} 계정 발급 및 연결", type="primary"):
                         if p_name and len(p_pin) == 4 and p_pin.isdigit() and linked_sts:
                             existing_p = next((p for p in db['parents'] if p['name'] == p_name and p['pin'] == p_pin), None)
                             
@@ -873,32 +880,31 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 
                             if existing_p:
                                 existing_p['linked_students'] = parsed_students
-                                st.success(f"[{p_name}] 학부모 계정의 연결 정보가 성공적으로 업데이트되었습니다!")
+                                st.success(f"[{p_name}] 계정의 연결 정보가 성공적으로 업데이트되었습니다!")
                             else:
                                 db['parents'].append({"name": p_name, "pin": p_pin, "linked_students": parsed_students})
-                                st.success(f"[{p_name}] 학부모 계정이 신규 발급되었습니다!")
+                                st.success(f"[{p_name}] 계정이 신규 발급되었습니다!")
                                 
                             if save_data(db):
                                 time.sleep(1)
                                 st.rerun()
                         else:
-                            st.error("학부모 이름, 4자리 숫자 비밀번호, 연결할 자녀를 모두 올바르게 입력해주세요.")
+                            st.error("이름, 4자리 숫자 비밀번호, 연결할 대상을 모두 올바르게 입력해주세요.")
                             
                 if db.get('parents'):
-                    st.write("#### 📋 등록된 학부모 및 연결 자녀 목록")
-                    # ✨ 리스트 디자인 개편 (표 형태를 버리고 계층 구조로 보기 좋게)
+                    st.write(f"#### 📋 등록된 {T_PARENT} 목록")
                     for p in db['parents']:
-                        with st.expander(f"👨‍👩‍👧 **{p['name']}** 학부모님"):
+                        with st.expander(f"👨‍👩‍👧 **{p['name']}**님"):
                             if p.get('linked_students'):
                                 for s in p['linked_students']:
-                                    st.markdown(f"🔹 **자녀명:** {s['name']} &nbsp;&nbsp;|&nbsp;&nbsp; **참여 프로그램:** {s['program']}")
+                                    st.markdown(f"🔹 **{T_USER}명:** {s['name']} &nbsp;&nbsp;|&nbsp;&nbsp; **참여 프로그램:** {s['program']}")
                             else:
-                                st.write("연결된 자녀가 없습니다.")
+                                st.write("연결된 데이터가 없습니다.")
                     
                     st.divider()
-                    st.write("#### 🗑️ 학부모 계정 영구 삭제")
-                    del_p = st.selectbox("삭제할 학부모 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed")
-                    if st.button("❌ 선택한 학부모 계정 삭제"):
+                    st.write(f"#### 🗑️ {T_PARENT} 계정 영구 삭제")
+                    del_p = st.selectbox("삭제할 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed")
+                    if st.button("❌ 선택한 계정 삭제"):
                         db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
                         if save_data(db): st.rerun()
 
@@ -1030,7 +1036,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         with tab_settings:
             with st.form("pin_form"):
                 npin = st.text_input("새 4자리 비밀번호", type="password", max_chars=4)
-                if st.form_submit_button("변경"):
+                if st.form_submit_button("비밀번호 변경"):
                     if len(npin) == 4 and npin.isdigit():
                         adm = next(a for a in db['admins'] if a['name'] == admin_info['name'])
                         op = adm['pin']; adm['pin'] = npin
@@ -1039,31 +1045,54 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     else: st.error("4자리 숫자로 입력해주세요.")
             
             if is_super:
+                # ✨ [신규 기능] 용어 화이트라벨 설정 패널 추가!
                 with st.container(border=True):
-                    st.subheader("👑 최고관리자: 선생님 계정 발급")
+                    st.subheader("🔤 맞춤형 호칭 설정 (화면 표시 명칭 변경)")
+                    st.info("💡 기관의 성격(학원, 청소년센터, 장애인기관 등)에 맞게 화면에 표시되는 호칭을 변경하세요.")
+                    with st.form("terms_form"):
+                        c1, c2, c3, c4 = st.columns(4)
+                        new_t_super = c1.text_input("최고관리자 호칭", value=T_SUPER, placeholder="예: 원장님, 최고관리자")
+                        new_t_admin = c2.text_input("일반관리자 호칭", value=T_ADMIN, placeholder="예: 선생님, 청소년지도사")
+                        new_t_user = c3.text_input("이용자 호칭", value=T_USER, placeholder="예: 학생, 청소년, 이용자")
+                        new_t_parent = c4.text_input("보호자 호칭", value=T_PARENT, placeholder="예: 학부모, 보호자")
+                        
+                        if st.form_submit_button("호칭 변경 적용", type="primary"):
+                            db['settings']['terms'] = {
+                                "super": new_t_super,
+                                "admin": new_t_admin,
+                                "user": new_t_user,
+                                "parent": new_t_parent
+                            }
+                            if save_data(db):
+                                st.success("모든 메뉴와 화면의 호칭이 기관에 맞게 성공적으로 변경되었습니다!")
+                                time.sleep(1)
+                                st.rerun()
+                
+                with st.container(border=True):
+                    st.subheader(f"👑 {T_SUPER}: {T_ADMIN} 계정 발급")
                     with st.form("new_admin_form"):
                         colA, colB = st.columns(2)
-                        new_adm_name = colA.text_input("새 관리자 이름 (예: 김철수 선생님)")
+                        new_adm_name = colA.text_input(f"새 {T_ADMIN} 이름 (예: 김철수 선생님)")
                         new_adm_pin = colB.text_input("초기 비밀번호 4자리", max_chars=4)
                         all_prog_titles = [p['title'] for p in db['programs']]
                         assign_progs = st.multiselect("담당 프로그램 할당", all_prog_titles)
                         
-                        if st.form_submit_button("관리자 계정 생성", type="primary"):
+                        if st.form_submit_button(f"{T_ADMIN} 계정 생성", type="primary"):
                             if not new_adm_name or len(new_adm_pin) != 4 or not new_adm_pin.isdigit():
                                 st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
                             else:
                                 db['admins'].append({"name": new_adm_name, "pin": new_adm_pin, "role": "normal", "programs": assign_progs})
                                 if save_data(db):
-                                    st.success(f"[{new_adm_name}] 선생님 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
+                                    st.success(f"[{new_adm_name}] 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
                                 else:
                                     db['admins'].pop()
                     
-                    st.write("#### 📋 등록된 선생님(관리자) 목록")
-                    df_admins = pd.DataFrame([{"이름": a['name'], "권한": "최고관리자" if a['role'] == "super" else "담당 지도사", "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
+                    st.write(f"#### 📋 등록된 {T_ADMIN} 목록")
+                    df_admins = pd.DataFrame([{"이름": a['name'], "권한": T_SUPER if a['role'] == "super" else T_ADMIN, "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
                     st.dataframe(df_admins, hide_index=True, use_container_width=True)
                     
                     st.divider()
-                    st.write("#### 🗑️ 선생님 계정 강제 삭제")
+                    st.write(f"#### 🗑️ {T_ADMIN} 계정 강제 삭제")
                     normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
                     if normal_admins:
                         col_del1, col_del2 = st.columns([8, 2])
@@ -1076,4 +1105,4 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             else:
                                 db['admins'] = temp_admins
                     else:
-                        st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
+                        st.info("현재 삭제할 수 있는 일반 계정이 없습니다.")
