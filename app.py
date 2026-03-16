@@ -7,6 +7,7 @@ import calendar
 import copy
 import time
 import urllib.request
+import io # ✨ 이미지 변환을 위한 모듈 추가
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
@@ -75,7 +76,7 @@ st.markdown("""
     [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } /* 찾아보기 */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } /* 나의 이야기 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } /* 학부모 공간 (신규) */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } /* 학부모 공간 */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } /* 관계자 외 */
     [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
     </style>
@@ -119,7 +120,6 @@ def load_data():
         if response.status_code == 200:
             data = response.json()
             if data and isinstance(data, dict) and 'programs' in data: 
-                # 학부모 데이터베이스 뼈대 추가 보장
                 if 'parents' not in data: data['parents'] = []
                 return data
     except Exception as e: st.error(f"🚨 연결 오류: {e}")
@@ -135,14 +135,13 @@ def save_data(data):
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
-if 'parents' not in db: db['parents'] = [] # 안정성 보장
+if 'parents' not in db: db['parents'] = [] 
 
 if 'menu_option' not in st.session_state: st.session_state.menu_option = "찾아보기 (탐색)"
 def change_page(page_name): st.session_state.menu_option = page_name; st.rerun()
 
 with st.sidebar:
     st.markdown("<div style='margin-bottom: 2rem; padding: 0 10px;'><div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div><div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div></div>", unsafe_allow_html=True)
-    # ✨ 학부모 공간 메뉴 추가
     menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", "👨‍👩‍👧 학부모 공간", "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", "👨‍👩‍👧 학부모 공간", "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
     st.write(""); st.write("")
     if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
@@ -225,7 +224,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지 (순수 학생용으로 분리)
+# [페이지 2-1] 청소년 전용 페이지
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 진행도")
@@ -323,7 +322,7 @@ elif st.session_state.menu_option == "나의 이야기":
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# ✨ [페이지 2-2] 학부모 전용 라운지 신설!
+# [페이지 2-2] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
     st.markdown("## 👨‍👩‍👧 학부모 전용 라운지")
@@ -346,19 +345,16 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                 if not linked_students:
                     st.info("아직 연결된 자녀(학생) 정보가 없습니다. 기관(학원)에 문의해주세요.")
                 else:
-                    # ✨ 다둥이(여러 자녀) 지원 탭
                     child_tabs = st.tabs([f"👦👧 {s['name']} ({s['program']})" for s in linked_students])
                     
                     for idx, s_info in enumerate(linked_students):
                         with child_tabs[idx]:
-                            # 해당 자녀의 실제 데이터 검색
                             s_record = next((u for u in db['users'] if u['name'] == s_info['name'] and u['program'] == s_info['program']), None)
                             
                             if s_record:
                                 st.markdown(f"### 🏅 [{s_record['program']}] 참가자 **{s_record['name']}**님")
                                 st.markdown(f"<span class='badge-blue'>담당 역할: {s_record['role']}</span>", unsafe_allow_html=True)
                                 
-                                # 1. 프로그램 전체 커리큘럼 (학부모용 열람 기능)
                                 prog_data = next((p for p in db['programs'] if p['title'] == s_record['program']), None)
                                 if prog_data:
                                     with st.expander("📚 [열람] 학원 프로그램 전체 커리큘럼 보기"):
@@ -370,7 +366,6 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                             for stask in t.get('subtasks', []):
                                                 st.write(f"  &nbsp;&nbsp;&nbsp;└ {stask['desc']}")
                                 
-                                # 2. 우리 아이 종합 리포트
                                 st.markdown("#### 📈 우리 아이 성장 리포트")
                                 tasks = s_record['workflow']
                                 task_names = [t['task'] for t in tasks]
@@ -400,28 +395,25 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                 if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
                                 st.write("---")
 
-                                # 3. 세부 활동 체크리스트 (읽기 전용 모드)
                                 st.write("#### ✅ 세부 활동 체크리스트 (열람 전용)")
                                 with st.container(border=True):
                                     for t_idx, t in enumerate(tasks):
-                                        st.checkbox(f"**{get_date_label(t)}{t['task']}**", value=t.get('done'), key=f"p_chk_{s_record['name']}_{u_idx}_{t_idx}", disabled=True)
+                                        st.checkbox(f"**{get_date_label(t)}{t['task']}**", value=t.get('done'), key=f"p_chk_{s_record['name']}_{idx}_{t_idx}", disabled=True)
                                         for s_idx, stask in enumerate(t.get('subtasks', [])):
                                             col_empty, col_chk = st.columns([1, 20])
                                             with col_chk:
-                                                st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"p_chk_sub_{s_record['name']}_{u_idx}_{t_idx}_{s_idx}", disabled=True)
+                                                st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"p_chk_sub_{s_record['name']}_{idx}_{t_idx}_{s_idx}", disabled=True)
                                 
-                                # 4. 학부모-선생님 1:1 메시지
                                 st.write("#### 💬 선생님께 메시지 보내기")
                                 chat_box = st.container(border=True, height=250)
                                 with chat_box:
                                     if not s_record.get('messages'): st.info("아직 나눈 대화가 없습니다.")
                                     for msg in s_record.get('messages', []):
                                         with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
-                                with st.form(f"p_chat_form_{s_record['name']}_{u_idx}", clear_on_submit=True):
+                                with st.form(f"p_chat_form_{s_record['name']}_{idx}", clear_on_submit=True):
                                     c1, c2 = st.columns([8, 2])
                                     msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
                                     if c2.form_submit_button("전송") and msg_input:
-                                        # ✨ 부모님 이름이 태그되어 선생님이 누군지 알 수 있게 전송
                                         s_record.setdefault('messages', []).append({"sender": "user", "content": f"[{p_info['name']}] {msg_input}"})
                                         if save_data(db): st.rerun()
                             else:
@@ -454,7 +446,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
         if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
-        # ✨ 새로운 '학부모 계정' 탭 동적 추가
         if is_super:
             tab_titles = ["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "👨‍👩‍👧 학부모 계정", "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"]
         else:
@@ -594,7 +585,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 st.rerun()
 
         with tab_overview:
-            st.write("#### 📊 데이터 필터링 및 엑셀 추출")
+            st.write("#### 📊 데이터 필터링 및 엑셀(이미지) 추출")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             if users_to_show:
                 overview_data = []
@@ -608,8 +599,34 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     })
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", "학생명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
-                csv_data = df_out.to_csv(index=False, encoding='utf-8-sig')
-                st.download_button("📥 결과 엑셀(CSV) 다운로드", data=csv_data, file_name="명단.csv", mime="text/csv", type="primary")
+                
+                # ✨ [CSV 대신 깨지지 않는 깔끔한 PNG 이미지로 명단 다운로드 기능 추가]
+                fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
+                ax_table.axis('tight')
+                ax_table.axis('off')
+                
+                table = ax_table.table(cellText=df_out.values, colLabels=df_out.columns, loc='center', cellLoc='center')
+                table.auto_set_font_size(False)
+                table.set_fontsize(11)
+                table.scale(1.2, 1.8)
+                
+                for (row, col), cell in table.get_celld().items():
+                    if row == 0:
+                        cell.set_facecolor('#4f46e5')
+                        cell.set_text_props(color='white', weight='bold')
+                
+                buf = io.BytesIO()
+                plt.savefig(buf, format="png", bbox_inches='tight', dpi=300)
+                buf.seek(0)
+                plt.close(fig_table) 
+                
+                st.download_button(
+                    label="📥 결과 이미지(PNG) 다운로드",
+                    data=buf,
+                    file_name=f"YouthCanvas_명단_{datetime.now().strftime('%Y%m%d')}.png",
+                    mime="image/png",
+                    type="primary"
+                )
             else: st.info("데이터가 없습니다.")
 
         with tab_attendance:
@@ -821,7 +838,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
-        # ✨ [신규 기능] 학부모 계정 발급 및 연결 관리 탭
         with tab_parents:
             st.subheader("👨‍👩‍👧 학부모 계정 발급 및 학생 연결")
             st.info("💡 학부모님 전용 계정을 만들고, 해당 계정으로 열람할 수 있는 자녀(학생)를 선택해 연결합니다. (어머니/아버지 개별 발급 가능)")
@@ -834,7 +850,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     p_name = col1.text_input("학부모 이름 (예: 권해리 어머니)")
                     p_pin = col2.text_input("학부모용 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
                     
-                    # 현재 관리자가 볼 수 있는 모든 학생 목록
                     all_students = [f"{u['name']} - {u['program']} ({u['role']})" for u in db['users'] if u['program'] in my_programs]
                     linked_sts = st.multiselect("이 학부모 계정과 연결할 자녀(학생) 선택 (다둥이 다중 선택 가능)", all_students)
                     
