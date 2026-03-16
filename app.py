@@ -8,19 +8,18 @@ import copy
 import time
 from datetime import datetime, date
 from collections import defaultdict
-import requests # ✨ Firebase 통신을 위해 필수!
-import matplotlib.pyplot as plt # ✨ 시각화를 위한 추가
-import seaborn as sns # ✨ 고급 통계 시각화를 위한 추가
+import requests 
+import matplotlib.pyplot as plt 
+import seaborn as sns 
 import matplotlib.font_manager as fm
 
 # --- [시각화 폰트 설정 (한글 깨짐 방지)] ---
 import platform
-if platform.system() == 'Darwin': # Mac
+if platform.system() == 'Darwin': 
     plt.rc('font', family='AppleGothic')
-elif platform.system() == 'Windows': # Windows
+elif platform.system() == 'Windows': 
     plt.rc('font', family='Malgun Gothic')
-else: # Linux (Streamlit Cloud 등)
-    # 클라우드에서는 폰트가 없을 수 있으므로 에러 무시 설정
+else: 
     pass
 plt.rcParams['axes.unicode_minus'] = False
 sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
@@ -31,11 +30,9 @@ st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
     <style>
-    /* ✨ 글자 깨짐 방지: 텍스트 관련 태그에만 안전하게 폰트 적용 */
     h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
         font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
     }
-    /* Streamlit 내부 아이콘 보호 */
     svg, [data-baseweb="icon"], .material-icons { font-family: inherit !important; }
 
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
@@ -215,7 +212,6 @@ elif st.session_state.menu_option == "나의 이야기":
                             for r_str in selected_role_strs:
                                 actual_role = r_str.split(" (")[0]
                                 my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
-                                # ✨ 새로 지원할 때 score와 comment 기본값 세팅
                                 for t in my_tasks: t['score'] = 0; t['comment'] = ""
                                 db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "alias": "", "attendance": {}})
                                 added_count += 1
@@ -239,10 +235,7 @@ elif st.session_state.menu_option == "나의 이야기":
                         st.markdown(f"<span class='badge-blue'>담당 역할: {data['role']}</span>", unsafe_allow_html=True)
                         st.write("")
                         
-                        # ✨ 종합 리포트 영역 추가
                         st.markdown("#### 📈 우리 아이 성장 리포트")
-                        
-                        # 데이터 집계
                         tasks = data['workflow']
                         task_names = [t['task'] for t in tasks]
                         task_scores = [t.get('score', 0) for t in tasks]
@@ -258,12 +251,10 @@ elif st.session_state.menu_option == "나의 이야기":
                         colR1.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
                         colR2.metric("선생님 종합 성취도 평가", f"{int(avg_score)}점", "100점 만점 기준")
                         
-                        # 성취도 시계열 그래프 (Streamlit Native - 모바일 최적화 및 폰트 깨짐 완벽 방어)
                         if task_scores:
                             df_scores = pd.DataFrame({"성취도 점수": task_scores}, index=task_names)
                             st.line_chart(df_scores, color="#e68128", height=200)
 
-                        # 선생님 코멘트 알림장
                         st.markdown("#### 💌 선생님의 따뜻한 알림장")
                         has_comments = False
                         for t in tasks:
@@ -273,7 +264,6 @@ elif st.session_state.menu_option == "나의 이야기":
                         if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
                         st.write("---")
 
-                        # 세부 활동 체크리스트
                         st.write("#### ✅ 세부 활동 체크리스트")
                         with st.container(border=True):
                             changed = False
@@ -288,7 +278,6 @@ elif st.session_state.menu_option == "나의 이야기":
                             if changed: 
                                 if save_data(db): st.rerun()
 
-                        # 소통 게시판
                         st.write("#### 💬 1:1 비밀 소통 게시판")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
@@ -304,7 +293,7 @@ elif st.session_state.menu_option == "나의 이야기":
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 3] 관리자 페이지 (경영 대시보드 추가)
+# [페이지 3] 관리자 페이지
 # =========================================================
 elif st.session_state.menu_option == "관계자 외 출입금지":
     if not st.session_state.get('admin_logged_in', False):
@@ -328,23 +317,19 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
         if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
-        # ✨ 새로운 탭 구성 (경영 대시보드 및 평가 코멘트 추가)
         tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_create, tab_edit, tab_settings = st.tabs([
             "📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"
         ])
         
-        # ✨ [제안 1, 3, 4 완벽 구현] 경영 대시보드 (Seaborn, Matplotlib 활용)
         with tab_dashboard:
             st.subheader("📈 학원장 전용 통합 경영 대시보드")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             
             if not users_to_show: st.info("데이터가 부족하여 대시보드를 생성할 수 없습니다.")
             else:
-                # 데이터프레임 전처리
                 dashboard_data = []
                 task_data = []
                 for u in users_to_show:
-                    # 성취도 및 출석률 계산
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     avg_score = sum(t_scores) / len(t_scores) if t_scores else 0
                     att_counts = sum(1 for v in u.get('attendance', {}).values() if v.get('status') == '출석')
@@ -361,44 +346,33 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                # 시각화 영역 1: 프로그램 비교 및 이상치 탐지 (Bar, Boxplot)
                 st.markdown("##### 🔍 프로그램별 성과 및 이상치 탐지")
                 fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-                
-                # Barplot: 프로그램별 평균 성취도
                 sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                 ax1.set_title('Average Score by Program')
                 ax1.set_ylim(0, 100)
                 ax1.tick_params(axis='x', rotation=45)
                 
-                # Boxplot: 이탈 위험군(이상치) 탐지
                 sns.boxplot(data=df_dash, x='Program', y='AvgScore', ax=ax2, palette='pastel')
                 ax2.set_title('Score Distribution & Outliers (Risk Detection)')
                 ax2.set_ylim(0, 100)
                 ax2.tick_params(axis='x', rotation=45)
-                
                 st.pyplot(fig1)
                 st.info("💡 **원장님 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
 
-                # 시각화 영역 2: 상관관계 및 난이도 조절 (Scatter, Histogram)
                 st.markdown("##### 🔍 강사 관리 효율성 및 과업 난이도 분석")
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
-                
-                # Scatterplot: 코멘트 작성 수 vs 학생 성취도 (강사 관리 효율성)
                 sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
                 ax3.set_title('Teacher Comments vs Student Score')
                 ax3.set_xlabel('Number of Comments Given')
                 ax3.set_ylabel('Average Score')
                 
-                # Histplot: 전체 과업 난이도 확인
                 sns.histplot(data=df_tasks, x='Score', bins=10, kde=True, ax=ax4, color='steelblue')
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
-                
                 st.pyplot(fig2)
                 st.info("💡 **원장님 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
 
-        # ✨ [제안 2 구현] 평가 및 코멘트 작성 탭 (강사용)
         with tab_eval:
             st.subheader("📝 학생 종합 평가 및 코멘트 작성")
             if not my_programs: st.info("담당 프로그램이 없습니다.")
@@ -419,12 +393,9 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         for t_idx, t in enumerate(target_user['workflow']):
                             st.markdown(f"**[{t['task']}]**")
                             c1, c2 = st.columns([3, 7])
-                            # 성취도 슬라이더 및 코멘트 인풋
                             new_score = c1.slider("성취도 점수", 0, 100, t.get('score', 0), key=f"score_{target_idx}_{t_idx}")
                             new_comment = c2.text_input("학부모 전송용 코멘트", value=t.get('comment', ''), placeholder="따뜻한 피드백을 적어주세요.", key=f"comment_{target_idx}_{t_idx}")
                             st.write("")
-                            
-                            # 데이터 즉시 반영을 위해 폼 제출 시 딕셔너리 업데이트
                             target_user['workflow'][t_idx]['score'] = new_score
                             target_user['workflow'][t_idx]['comment'] = new_comment
                             
@@ -434,7 +405,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 time.sleep(1)
                                 st.rerun()
 
-        # 기존 탭들 (종합 명단, 출석, 소통, 개설, 수정, 설정) 로직 유지
         with tab_overview:
             st.write("#### 📊 데이터 필터링 및 엑셀 추출")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
@@ -530,9 +500,104 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
                     else: db['programs'].pop()
 
+        # ✨ [복구 완료] 정보 수정 탭 완벽하게 부활!
         with tab_edit:
-            st.info("프로그램 세부 정보 수정은 관리자 매뉴얼을 참고해 주세요.")
-            
+            if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
+            else:
+                with st.container(border=True):
+                    edit_title = st.selectbox("⚙️ 수정할 프로그램 선택", my_programs)
+                    p_idx = [p['title'] for p in db['programs']].index(edit_title)
+                    p_data = db['programs'][p_idx]
+                    
+                    initial_w = ""
+                    for role, tasks in p_data.get('roles_workflow', {}).items():
+                        cap = p_data.get('roles_capacity', {}).get(role, 10)
+                        initial_w += f"[{role} : {cap}명]\n"
+                        for t in tasks:
+                            sd, ed = get_date_range(t)
+                            if sd and ed and sd != ed: initial_w += f"{sd} ~ {ed} : {t['task']}\n"
+                            elif sd and sd != "-": initial_w += f"{sd} : {t['task']}\n"
+                            else: initial_w += f"{t['task']}\n"
+                            for stask in t.get('subtasks', []):
+                                initial_w += f"- {stask['desc']}\n"
+                        initial_w += "\n"
+
+                    with st.form("edit_form"):
+                        colA, colB = st.columns([8, 2])
+                        new_t = colA.text_input("프로그램 명", value=p_data['title'])
+                        new_color = colB.color_picker("캘린더 색상 변경", value=p_data.get('color', '#4f46e5'))
+                        
+                        st.write("🗓️ **모집 기간 변경**")
+                        colD1, colD2 = st.columns(2)
+                        def_start = datetime.strptime(p_data.get('recruit_start', today_str), "%Y-%m-%d")
+                        def_end = datetime.strptime(p_data.get('recruit_end', "2026-12-31"), "%Y-%m-%d")
+                        new_r_start = colD1.date_input("모집 시작일 수정", value=def_start)
+                        new_r_end = colD2.date_input("모집 종료일 수정", value=def_end)
+
+                        new_d = st.text_area("상세 내용", value=p_data['desc'])
+                        new_v = st.text_input("유튜브 링크", value=p_data.get('video',''))
+                        st.info("세부 목표는 메인 과업 바로 아랫줄에 '-' 기호를 붙여 작성하세요.")
+                        new_w = st.text_area("워크플로우 수정 (기간은 물결 ~ 사용)", value=initial_w.strip(), height=300)
+                        
+                        if st.form_submit_button("수정 내용 저장", type="primary"):
+                            pw = {}; pc = {}; cr = None
+                            for line in new_w.split('\n'):
+                                line = line.strip()
+                                if not line: continue
+                                if line.startswith('[') and ']' in line:
+                                    cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
+                                    pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
+                                    pw[cr] = []
+                                elif cr and ':' in line and not line.startswith('-'):
+                                    dt, tk = line.split(':', 1)
+                                    sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
+                                    pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                                elif cr and line.startswith('-'):
+                                    if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
+                            
+                            old_title = p_data['title']
+                            
+                            # 1. 관리자 권한 내 프로그램명 변경
+                            if new_t != old_title:
+                                for a in db['admins']:
+                                    if old_title in a.get('programs', []):
+                                        a['programs'] = [new_t if x == old_title else x for x in a['programs']]
+                                        
+                            # 2. 기존 학생들의 진도, 코멘트, 점수 보존 처리 (핵심!)
+                            for u in db['users']:
+                                if u['program'] == old_title:
+                                    u['program'] = new_t 
+                                    if u['role'] in pw:
+                                        new_user_workflow = copy.deepcopy(pw[u['role']])
+                                        for new_t_dict in new_user_workflow:
+                                            for old_t_dict in u['workflow']:
+                                                if new_t_dict['task'] == old_t_dict['task']:
+                                                    new_t_dict['done'] = old_t_dict.get('done', False)
+                                                    new_t_dict['score'] = old_t_dict.get('score', 0)
+                                                    new_t_dict['comment'] = old_t_dict.get('comment', "")
+                                                    for new_st_dict in new_t_dict.get('subtasks', []):
+                                                        for old_st_dict in old_t_dict.get('subtasks', []):
+                                                            if new_st_dict['desc'] == old_st_dict['desc']:
+                                                                new_st_dict['done'] = old_st_dict.get('done', False)
+                                        u['workflow'] = new_user_workflow
+                            
+                            # 3. 프로그램 업데이트
+                            temp_prog = db['programs'][p_idx]
+                            db['programs'][p_idx] = {
+                                "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
+                                "recruit_start": new_r_start.strftime("%Y-%m-%d"),
+                                "recruit_end": new_r_end.strftime("%Y-%m-%d"),
+                                "roles_capacity": pc, "roles_workflow": pw
+                            }
+                            
+                            if save_data(db):
+                                st.success("수정 완료! 새로운 기능과 데이터가 완벽하게 동기화되었습니다. 보안을 위해 잠시 후 로그아웃됩니다.")
+                                time.sleep(2)
+                                st.session_state['admin_logged_in'] = False
+                                st.rerun()
+                            else:
+                                db['programs'][p_idx] = temp_prog # 롤백
+
         with tab_settings:
             with st.form("pin_form"):
                 npin = st.text_input("새 4자리 비밀번호", type="password", max_chars=4)
