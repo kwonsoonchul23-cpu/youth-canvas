@@ -168,6 +168,44 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                 tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
                 
+                # ✨ [복구 완료] 잃어버렸던 '전체 일정 요약 보기' 기능 부활!
+                grouped_tasks = defaultdict(list)
+                for role, tasks in prog.get('roles_workflow', {}).items():
+                    for t in tasks:
+                        label = get_date_label(t)
+                        date_val = label if label else "일정 미정"
+                        
+                        sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
+                        if sub_texts:
+                            task_display = f"{t['task']} <br><span style='color:gray;font-size:0.85em;'>└ {', '.join(sub_texts)}</span>"
+                        else:
+                            task_display = t['task']
+                            
+                        grouped_tasks[date_val].append({"role": role, "task": task_display})
+                
+                if grouped_tasks:
+                    def sort_by_number(d):
+                        nums = re.findall(r'\d+', d)
+                        return (0, int(nums[0]), d) if nums else (1, 0, d)
+                    sorted_dates = sorted(grouped_tasks.keys(), key=sort_by_number)
+                    max_roles_in_a_day = max([len(tasks) for tasks in grouped_tasks.values()] + [0])
+                    
+                    with st.expander("📅 전체 일정 요약 보기"):
+                        html_table = "<table class='schedule-table'><tr><th>일정</th>"
+                        for _ in range(max_roles_in_a_day): html_table += "<th>역할</th><th>내용</th>"
+                        html_table += "</tr>"
+                        for d in sorted_dates:
+                            html_table += f"<tr><td style='font-weight:bold;'>{d}</td>"
+                            tasks_on_date = grouped_tasks[d]
+                            for i in range(max_roles_in_a_day):
+                                if i < len(tasks_on_date):
+                                    html_table += f"<td>{tasks_on_date[i]['role']}</td><td class='task-content'>{tasks_on_date[i]['task']}</td>"
+                                else: html_table += "<td></td><td></td>"
+                            html_table += "</tr>"
+                        html_table += "</table>"
+                        st.markdown(html_table, unsafe_allow_html=True)
+                # ✨ (여기까지 복구 완료된 블록입니다)
+
                 st.write(f"**현재 참여 인원** ({total_curr}/{total_cap}명)")
                 st.progress(total_curr/total_cap if total_cap > 0 else 0)
                 
@@ -176,7 +214,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2] 청소년/학부모 페이지 (리포트 기능 추가)
+# [페이지 2] 청소년/학부모 페이지 
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 및 성장 리포트")
@@ -281,7 +319,7 @@ elif st.session_state.menu_option == "나의 이야기":
                         st.write("#### 💬 1:1 비밀 소통 게시판")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
-                            if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
+                            if not data.get('messages'): st.info("아직 나문을 대화가 없습니다.")
                             for msg in data.get('messages', []):
                                 with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
                         with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
@@ -475,7 +513,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 c1, c2 = st.columns([8, 2])
                 t = c1.text_input("프로그램 명")
                 color = c2.color_picker("색상", "#4f46e5")
-                # ✨ 버그 원인 해결: re -> col_re 로 변수명 변경
                 col_rs, col_re = st.columns(2) 
                 r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
                 d = st.text_area("소개"); v = st.text_input("유튜브 링크")
@@ -501,7 +538,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
                     else: db['programs'].pop()
 
-        # ✨ [복구 완료] 정보 수정 기능 부활
         with tab_edit:
             if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
             else:
@@ -606,3 +642,43 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         if save_data(db): st.success("변경 완료. 다시 로그인하세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
                         else: adm['pin'] = op
                     else: st.error("4자리 숫자로 입력해주세요.")
+            
+            if is_super:
+                with st.container(border=True):
+                    st.subheader("👑 최고관리자: 선생님 계정 발급")
+                    with st.form("new_admin_form"):
+                        colA, colB = st.columns(2)
+                        new_adm_name = colA.text_input("새 관리자 이름 (예: 김철수 선생님)")
+                        new_adm_pin = colB.text_input("초기 비밀번호 4자리", max_chars=4)
+                        all_prog_titles = [p['title'] for p in db['programs']]
+                        assign_progs = st.multiselect("담당 프로그램 할당", all_prog_titles)
+                        
+                        if st.form_submit_button("관리자 계정 생성", type="primary"):
+                            if not new_adm_name or len(new_adm_pin) != 4 or not new_adm_pin.isdigit():
+                                st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
+                            else:
+                                db['admins'].append({"name": new_adm_name, "pin": new_adm_pin, "role": "normal", "programs": assign_progs})
+                                if save_data(db):
+                                    st.success(f"[{new_adm_name}] 선생님 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
+                                else:
+                                    db['admins'].pop()
+                    
+                    st.write("#### 📋 등록된 선생님(관리자) 목록")
+                    df_admins = pd.DataFrame([{"이름": a['name'], "권한": "최고관리자" if a['role'] == "super" else "담당 지도사", "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
+                    st.dataframe(df_admins, hide_index=True, use_container_width=True)
+                    
+                    st.divider()
+                    st.write("#### 🗑️ 선생님 계정 강제 삭제")
+                    normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
+                    if normal_admins:
+                        col_del1, col_del2 = st.columns([8, 2])
+                        admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed")
+                        if col_del2.button("❌ 계정 삭제", type="primary", use_container_width=True):
+                            temp_admins = copy.deepcopy(db['admins'])
+                            db['admins'] = [a for a in db['admins'] if a['name'] != admin_to_delete]
+                            if save_data(db):
+                                st.success(f"[{admin_to_delete}] 계정이 성공적으로 삭제되었습니다."); time.sleep(1); st.rerun()
+                            else:
+                                db['admins'] = temp_admins
+                    else:
+                        st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
