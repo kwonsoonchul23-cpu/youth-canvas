@@ -224,7 +224,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지 
+# [페이지 2-1] 청소년 전용 페이지 (학생용 탭)
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 진행도")
@@ -261,7 +261,7 @@ elif st.session_state.menu_option == "나의 이야기":
                                 actual_role = r_str.split(" (")[0]
                                 my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
                                 for t in my_tasks: t['score'] = 0; t['comment'] = ""
-                                db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "alias": "", "attendance": {}})
+                                db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "parent_messages": [], "alias": "", "attendance": {}})
                                 added_count += 1
                             if save_data(db): st.success("🎉 지원 완료!"); time.sleep(1); st.rerun()
                             else:
@@ -307,7 +307,8 @@ elif st.session_state.menu_option == "나의 이야기":
                             if changed: 
                                 if save_data(db): st.rerun()
 
-                        st.write("#### 💬 선생님과 1:1 비밀 소통 게시판")
+                        # ✨ 학생용 채팅방 (messages 사용)
+                        st.write("#### 💬 선생님과 1:1 비밀 소통 게시판 (학생 전용)")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
                             if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -322,7 +323,7 @@ elif st.session_state.menu_option == "나의 이야기":
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# ✨ [페이지 2-2] 학부모 전용 라운지 (버그 픽스 완료!)
+# ✨ [페이지 2-2] 학부모 전용 라운지 (채팅 완전 분리)
 # =========================================================
 elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
     st.markdown("## 👨‍👩‍👧 학부모 전용 라운지")
@@ -395,7 +396,6 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                 if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
                                 st.write("---")
 
-                                # ✨ 여기서 변수명 충돌 버그를 `idx`로 수정했습니다.
                                 st.write("#### ✅ 세부 활동 체크리스트 (열람 전용)")
                                 with st.container(border=True):
                                     for t_idx, t in enumerate(tasks):
@@ -405,18 +405,18 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                             with col_chk:
                                                 st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"p_chk_sub_{s_record['name']}_{idx}_{t_idx}_{s_idx}", disabled=True)
                                 
-                                st.write("#### 💬 선생님께 메시지 보내기")
+                                # ✨ 학부모 전용 채팅방 (학생의 채팅과 완전 분리)
+                                st.write("#### 💬 선생님께 메시지 보내기 (학생 비공개)")
                                 chat_box = st.container(border=True, height=250)
                                 with chat_box:
-                                    if not s_record.get('messages'): st.info("아직 나눈 대화가 없습니다.")
-                                    for msg in s_record.get('messages', []):
+                                    if not s_record.get('parent_messages'): st.info("아직 나눈 대화가 없습니다.")
+                                    for msg in s_record.get('parent_messages', []):
                                         with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
-                                # ✨ 폼의 key 변수명도 `idx`로 수정했습니다.
                                 with st.form(f"p_chat_form_{s_record['name']}_{idx}", clear_on_submit=True):
                                     c1, c2 = st.columns([8, 2])
                                     msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
                                     if c2.form_submit_button("전송") and msg_input:
-                                        s_record.setdefault('messages', []).append({"sender": "user", "content": f"[{p_info['name']}] {msg_input}"})
+                                        s_record.setdefault('parent_messages', []).append({"sender": "user", "content": f"[{p_info['name']}] {msg_input}"})
                                         if save_data(db): st.rerun()
                             else:
                                 st.error(f"[{s_info['name']}] 학생의 데이터를 찾을 수 없습니다. 프로그램이 종료되었거나 이름이 변경되었을 수 있습니다.")
@@ -544,7 +544,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
-                st.info(f"💡 **{insight_caller} 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
 
         with tab_eval:
             st.subheader("📝 학생 주차/과업별 달성도 및 코멘트 평가")
@@ -827,18 +826,26 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     tu = db['users'][t_idx]
                     
                     with st.container(border=True):
-                        st.write("💬 1:1 대화방")
-                        for msg in tu.get('messages', []):
+                        # ✨ 토글 버튼으로 관리자(선생님)가 학생 대화와 학부모 대화를 선택해서 볼 수 있게 기능 추가!
+                        chat_target = st.radio("💬 대화 상대 선택", ["👦 학생과 대화", "👨‍👩‍👧 학부모와 대화"], horizontal=True)
+                        msg_key = 'messages' if chat_target == "👦 학생과 대화" else 'parent_messages'
+                        
+                        st.divider()
+                        if not tu.get(msg_key): st.info("아직 나눈 대화가 없습니다.")
+                        for msg in tu.get(msg_key, []):
                             with st.chat_message("assistant" if msg['sender'] == 'admin' else "user"): st.write(msg['content'])
-                        with st.form(f"adm_chat_{t_idx}", clear_on_submit=True):
+                        
+                        # ✨ form의 key 값에 msg_key를 추가하여 에러 방지 및 완벽 분리
+                        with st.form(f"adm_chat_{t_idx}_{msg_key}", clear_on_submit=True):
                             c1, c2 = st.columns([8, 2])
                             ri = c1.text_input("답장", label_visibility="collapsed")
                             if c2.form_submit_button("전송") and ri:
-                                tu.setdefault('messages', []).append({"sender": "admin", "content": ri})
+                                tu.setdefault(msg_key, []).append({"sender": "admin", "content": ri})
                                 if save_data(db): st.rerun()
                     if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
+        # ✨ [학부모 목록 UI 개편] 정신없는 표 대신 아코디언(expander) 스타일로 깔끔하게 정리
         with tab_parents:
             st.subheader("👨‍👩‍👧 학부모 계정 발급 및 학생 연결")
             st.info("💡 학부모님 전용 계정을 만들고, 해당 계정으로 열람할 수 있는 자녀(학생)를 선택해 연결합니다. (어머니/아버지 개별 발급 가능)")
@@ -878,12 +885,15 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             st.error("학부모 이름, 4자리 숫자 비밀번호, 연결할 자녀를 모두 올바르게 입력해주세요.")
                             
                 if db.get('parents'):
-                    st.write("#### 📋 등록된 학부모 목록")
-                    parent_list = []
+                    st.write("#### 📋 등록된 학부모 및 연결 자녀 목록")
+                    # ✨ 리스트 디자인 개편 (표 형태를 버리고 계층 구조로 보기 좋게)
                     for p in db['parents']:
-                        linked_str = ", ".join([f"{s['name']}({s['program']})" for s in p.get('linked_students', [])])
-                        parent_list.append({"학부모 이름": p['name'], "연결된 자녀 내역": linked_str})
-                    st.dataframe(pd.DataFrame(parent_list), hide_index=True, use_container_width=True)
+                        with st.expander(f"👨‍👩‍👧 **{p['name']}** 학부모님"):
+                            if p.get('linked_students'):
+                                for s in p['linked_students']:
+                                    st.markdown(f"🔹 **자녀명:** {s['name']} &nbsp;&nbsp;|&nbsp;&nbsp; **참여 프로그램:** {s['program']}")
+                            else:
+                                st.write("연결된 자녀가 없습니다.")
                     
                     st.divider()
                     st.write("#### 🗑️ 학부모 계정 영구 삭제")
