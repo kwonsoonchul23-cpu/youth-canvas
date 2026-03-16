@@ -7,7 +7,7 @@ import calendar
 import copy
 import time
 import urllib.request
-import io # ✨ 이미지 변환을 위한 모듈 추가
+import io
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
@@ -74,10 +74,10 @@ st.markdown("""
     [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
     [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) { width: 100%; padding-left: 15px; }
     [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } /* 찾아보기 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } /* 나의 이야기 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } /* 학부모 공간 */
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } /* 관계자 외 */
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } 
     [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
     </style>
 """, unsafe_allow_html=True)
@@ -224,7 +224,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지
+# [페이지 2-1] 청소년 전용 페이지 
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 진행도")
@@ -322,7 +322,7 @@ elif st.session_state.menu_option == "나의 이야기":
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 2-2] 학부모 전용 라운지
+# ✨ [페이지 2-2] 학부모 전용 라운지 (버그 픽스 완료!)
 # =========================================================
 elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
     st.markdown("## 👨‍👩‍👧 학부모 전용 라운지")
@@ -395,6 +395,7 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                 if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
                                 st.write("---")
 
+                                # ✨ 여기서 변수명 충돌 버그를 `idx`로 수정했습니다.
                                 st.write("#### ✅ 세부 활동 체크리스트 (열람 전용)")
                                 with st.container(border=True):
                                     for t_idx, t in enumerate(tasks):
@@ -410,6 +411,7 @@ elif st.session_state.menu_option == "👨‍👩‍👧 학부모 공간":
                                     if not s_record.get('messages'): st.info("아직 나눈 대화가 없습니다.")
                                     for msg in s_record.get('messages', []):
                                         with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
+                                # ✨ 폼의 key 변수명도 `idx`로 수정했습니다.
                                 with st.form(f"p_chat_form_{s_record['name']}_{idx}", clear_on_submit=True):
                                     c1, c2 = st.columns([8, 2])
                                     msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
@@ -600,7 +602,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", "학생명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
-                # ✨ [CSV 대신 깨지지 않는 깔끔한 PNG 이미지로 명단 다운로드 기능 추가]
                 fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
                 ax_table.axis('tight')
                 ax_table.axis('off')
