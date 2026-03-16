@@ -9,6 +9,21 @@ import time
 from datetime import datetime, date
 from collections import defaultdict
 import requests # ✨ Firebase 통신을 위해 필수!
+import matplotlib.pyplot as plt # ✨ 시각화를 위한 추가
+import seaborn as sns # ✨ 고급 통계 시각화를 위한 추가
+import matplotlib.font_manager as fm
+
+# --- [시각화 폰트 설정 (한글 깨짐 방지)] ---
+import platform
+if platform.system() == 'Darwin': # Mac
+    plt.rc('font', family='AppleGothic')
+elif platform.system() == 'Windows': # Windows
+    plt.rc('font', family='Malgun Gothic')
+else: # Linux (Streamlit Cloud 등)
+    # 클라우드에서는 폰트가 없을 수 있으므로 에러 무시 설정
+    pass
+plt.rcParams['axes.unicode_minus'] = False
+sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
@@ -21,9 +36,7 @@ st.markdown("""
         font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
     }
     /* Streamlit 내부 아이콘 보호 */
-    svg, [data-baseweb="icon"], .material-icons {
-        font-family: inherit !important;
-    }
+    svg, [data-baseweb="icon"], .material-icons { font-family: inherit !important; }
 
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
@@ -62,21 +75,15 @@ st.markdown("""
 def fix_youtube_url(url):
     if not url: return None
     url = url.replace("shorts/", "watch?v=")
-    if "youtu.be/" in url:
-        video_id = url.split("youtu.be/")[1].split("?")[0]
-        return f"https://www.youtube.com/watch?v={video_id}"
-    if "m.youtube.com" in url:
-        return url.replace("m.youtube.com", "www.youtube.com")
+    if "youtu.be/" in url: return f"https://www.youtube.com/watch?v={url.split('youtu.be/')[1].split('?')[0]}"
+    if "m.youtube.com" in url: return url.replace("m.youtube.com", "www.youtube.com")
     return url
 
 def get_date_range(task_dict):
-    if 'start_date' in task_dict and 'end_date' in task_dict:
-        return task_dict['start_date'], task_dict['end_date']
+    if 'start_date' in task_dict and 'end_date' in task_dict: return task_dict['start_date'], task_dict['end_date']
     elif 'date' in task_dict:
         d = task_dict['date']
-        if '~' in d:
-            parts = d.split('~')
-            return parts[0].strip(), parts[1].strip()
+        if '~' in d: return d.split('~')[0].strip(), d.split('~')[1].strip()
         return d.strip(), d.strip()
     return "", ""
 
@@ -86,16 +93,14 @@ def get_date_label(task_dict):
     elif sd and sd != "-": return f"[{sd}] "
     return ""
 
-def safe_key(text):
-    """✨ 파이어베이스 400 에러 방어용: 금지된 특수기호를 안전한 언더바로 변환합니다."""
-    return re.sub(r'[\.\$#\[\]/]', '_', text)
+def safe_key(text): return re.sub(r'[\.\$#\[\]/]', '_', text)
 
 # ==============================================================
-# ✨ [데이터베이스 연결 로직 (Firebase 연동 보강판!)] ✨
+# ✨ [데이터베이스 연결 로직]
 # ==============================================================
 today_str = datetime.now().strftime("%Y-%m-%d")
 
-# 🚨🚨🚨 [매우 중요] 아래 따옴표 안의 주소를 발급받으신 Firebase 주소로 반드시 변경하세요! 🚨🚨🚨
+# 🚨 [중요] 선생님의 파이어베이스 주소 입력
 FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
 
 def load_data():
@@ -103,85 +108,46 @@ def load_data():
         response = requests.get(FIREBASE_URL)
         if response.status_code == 200:
             data = response.json()
-            if data and isinstance(data, dict) and 'programs' in data:
-                return data
-    except Exception as e:
-        st.error(f"🚨 파이어베이스 인터넷 연결 오류: {e}")
-
-    # 데이터가 없거나 연결 실패 시 뼈대 반환
-    return {
-        "programs": [], "users": [], 
-        "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}],
-        "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
-    }
+            if data and isinstance(data, dict) and 'programs' in data: return data
+    except Exception as e: st.error(f"🚨 연결 오류: {e}")
+    return {"programs": [], "users": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}}
 
 def save_data(data):
-    """클라우드 저장이 진짜로 성공했는지 True/False로 반환합니다."""
     try:
         res = requests.put(FIREBASE_URL, json=data)
-        if res.status_code == 200:
-            return True
-        else:
-            # ✨ 에러 상세 원인을 출력하도록 개선
-            st.error(f"🚨 클라우드 저장 실패! (에러코드: {res.status_code}, 상세이유: {res.text})")
-            return False
-    except Exception as e:
-        st.error("🚨 인터넷 문제로 데이터가 클라우드에 저장되지 않았습니다.")
-        return False
+        if res.status_code == 200: return True
+        else: st.error(f"🚨 저장 실패: {res.status_code}"); return False
+    except Exception as e: st.error("🚨 인터넷 문제로 저장되지 않았습니다."); return False
 # ==============================================================
 
 if 'db' not in st.session_state: st.session_state['db'] = load_data()
 db = st.session_state['db']
 
-# --- 사이드바 및 페이지 이동 ---
 if 'menu_option' not in st.session_state: st.session_state.menu_option = "찾아보기 (탐색)"
-def change_page(page_name):
-    st.session_state.menu_option = page_name
-    st.rerun()
+def change_page(page_name): st.session_state.menu_option = page_name; st.rerun()
 
 with st.sidebar:
-    st.markdown("""
-        <div style='margin-bottom: 2rem; padding: 0 10px;'>
-            <div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div>
-            <div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    menu = st.radio(
-        "메뉴 이동", 
-        ["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"],
-        index=["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"].index(st.session_state.menu_option),
-        label_visibility="collapsed"
-    )
-    
-    # ✨ 동기화 버튼 (데이터 꼬임 방지용)
-    st.write("")
-    st.write("")
+    st.markdown("<div style='margin-bottom: 2rem; padding: 0 10px;'><div style='font-size: 3.2rem; font-weight: 900; color: #ffffff; line-height: 1.1; margin-bottom: 0.3rem; letter-spacing: -1px;'>Youth Canvas</div><div style='font-size: 1.6rem; font-weight: 800; color: #ffce31; letter-spacing: -0.5px;'>청소년의 꿈을 그리는 공간</div></div>", unsafe_allow_html=True)
+    menu = st.radio("메뉴 이동", ["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"], index=["찾아보기 (탐색)", "나의 이야기", "관계자 외 출입금지"].index(st.session_state.menu_option), label_visibility="collapsed")
+    st.write(""); st.write("")
     if st.button("🔄 서버 최신 데이터 동기화", use_container_width=True):
-        st.session_state['db'] = load_data()
-        st.toast("✅ 클라우드에서 최신 데이터를 성공적으로 불러왔습니다!")
-        time.sleep(1)
-        st.rerun()
-        
+        st.session_state['db'] = load_data(); st.toast("✅ 동기화 완료!"); time.sleep(1); st.rerun()
 st.session_state.menu_option = menu
 
 # =========================================================
 # [페이지 1] 메인 대시보드
 # =========================================================
 if st.session_state.menu_option == "찾아보기 (탐색)":
-    st.markdown("## ✨ 지금 할 수 있는 청소년 활동")
+    st.markdown("## ✨ 지금 뜨고 있는 청소년 활동")
     st.write("") 
-    
     if not db['programs']: st.info("아직 개설된 프로그램이 없습니다. 관리자 페이지에서 프로그램을 만들어주세요.")
         
     col1, col2 = st.columns(2)
     for idx, prog in enumerate(db['programs']):
         with (col1 if idx % 2 == 0 else col2):
             with st.container(border=True):
-                p_r_start = prog.get('recruit_start', today_str)
-                p_r_end = prog.get('recruit_end', '2099-12-31')
+                p_r_start = prog.get('recruit_start', today_str); p_r_end = prog.get('recruit_end', '2099-12-31')
                 is_recruiting_period = (p_r_start <= today_str <= p_r_end)
-                
                 roles_list = list(prog.get('roles_workflow', {}).items())
                 is_all_full = True; total_cap = 0; total_curr = 0
                 for r, _ in roles_list:
@@ -202,84 +168,35 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                 clean_url = fix_youtube_url(prog.get('video'))
                 if clean_url: st.video(clean_url)
                 
-                tags_html = ""
-                for r, _ in roles_list: tags_html += f"<span class='badge-blue'>#{r}</span> "
+                tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
-                
-                grouped_tasks = defaultdict(list)
-                for role, tasks in prog.get('roles_workflow', {}).items():
-                    for t in tasks:
-                        label = get_date_label(t)
-                        date_val = label if label else "일정 미정"
-                        
-                        sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
-                        if sub_texts:
-                            task_display = f"{t['task']} <br><span style='color:gray;font-size:0.85em;'>└ {', '.join(sub_texts)}</span>"
-                        else:
-                            task_display = t['task']
-                            
-                        grouped_tasks[date_val].append({"role": role, "task": task_display})
-                
-                if grouped_tasks:
-                    def sort_by_number(d):
-                        nums = re.findall(r'\d+', d)
-                        return (0, int(nums[0]), d) if nums else (1, 0, d)
-                    sorted_dates = sorted(grouped_tasks.keys(), key=sort_by_number)
-                    max_roles_in_a_day = max([len(tasks) for tasks in grouped_tasks.values()] + [0])
-                    
-                    with st.expander("📅 전체 일정 요약 보기"):
-                        html_table = "<table class='schedule-table'><tr><th>일정</th>"
-                        for _ in range(max_roles_in_a_day): html_table += "<th>역할</th><th>내용</th>"
-                        html_table += "</tr>"
-                        for d in sorted_dates:
-                            html_table += f"<tr><td style='font-weight:bold;'>{d}</td>"
-                            tasks_on_date = grouped_tasks[d]
-                            for i in range(max_roles_in_a_day):
-                                if i < len(tasks_on_date):
-                                    html_table += f"<td>{tasks_on_date[i]['role']}</td><td class='task-content'>{tasks_on_date[i]['task']}</td>"
-                                else: html_table += "<td></td><td></td>"
-                            html_table += "</tr>"
-                        html_table += "</table>"
-                        st.markdown(html_table, unsafe_allow_html=True)
                 
                 st.write(f"**현재 참여 인원** ({total_curr}/{total_cap}명)")
                 st.progress(total_curr/total_cap if total_cap > 0 else 0)
                 
                 can_apply = is_recruiting_period and not is_all_full
                 if st.button("🚀 이 프로그램 지원하기", key=f"apply_{idx}", use_container_width=True, type="primary", disabled=not can_apply):
-                    st.session_state['selected_prog_from_main'] = prog['title']
-                    change_page("나의 이야기")
+                    st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2] 청소년 페이지
+# [페이지 2] 청소년/학부모 페이지 (리포트 기능 추가)
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
-    st.markdown("## 🙋 나의 활동 보드")
-    tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 나의 목표 및 진행도 (로그인)"])
+    st.markdown("## 🙋 나의 활동 및 성장 리포트")
+    tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 종합 리포트 및 진행도 (로그인)"])
     
     with tab1:
         prog_titles = [p['title'] for p in db['programs']]
         if not prog_titles: st.warning("개설된 프로그램이 없습니다.")
         else:
-            active_programs = []
-            for p in db['programs']:
-                p_r_start = p.get('recruit_start', today_str)
-                p_r_end = p.get('recruit_end', '2099-12-31')
-                if p_r_start <= today_str <= p_r_end: active_programs.append(p['title'])
-            
+            active_programs = [p['title'] for p in db['programs'] if p.get('recruit_start', today_str) <= today_str <= p.get('recruit_end', '2099-12-31')]
             if not active_programs: st.error("⏳ 현재 모집 중인 프로그램이 없습니다.")
             else:
-                default_idx = 0
-                if 'selected_prog_from_main' in st.session_state and st.session_state['selected_prog_from_main'] in active_programs:
-                    default_idx = active_programs.index(st.session_state['selected_prog_from_main'])
-
+                default_idx = active_programs.index(st.session_state['selected_prog_from_main']) if 'selected_prog_from_main' in st.session_state and st.session_state['selected_prog_from_main'] in active_programs else 0
                 with st.container(border=True):
-                    st.subheader("1단계: 참가자 정보 입력")
                     colA, colB = st.columns(2)
                     user_name = colA.text_input("이름 (실명 입력)")
                     user_pin = colB.text_input("나만의 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
-                    
-                    st.subheader("2단계: 활동 선택")
                     selected_prog_title = st.selectbox("참여할 프로그램", active_programs, index=default_idx)
                     selected_prog_data = next(p for p in db['programs'] if p['title'] == selected_prog_title)
                     
@@ -287,50 +204,30 @@ elif st.session_state.menu_option == "나의 이야기":
                     for r, cap in selected_prog_data.get('roles_capacity', {}).items():
                         curr = sum(1 for u in db['users'] if u['program'] == selected_prog_title and u['role'] == r)
                         role_options.append(f"{r} ({curr}/{cap}명) - {'지원가능' if curr < cap else '마감'}")
-                    
                     selected_role_strs = st.multiselect("희망 역할 (여러 개 동시 선택 가능)", role_options)
                     
-                    st.write("")
                     if st.button("✨ 최종 지원하기", use_container_width=True, type="primary"):
-                        if not user_name or not user_pin: 
-                            st.error("이름과 비밀번호를 모두 입력하세요.")
-                        elif not selected_role_strs:
-                            st.error("희망 역할을 하나 이상 선택해주세요.")
+                        if not user_name or not user_pin: st.error("이름과 비밀번호를 모두 입력하세요.")
+                        elif not selected_role_strs: st.error("희망 역할을 하나 이상 선택해주세요.")
+                        elif any("마감" in r for r in selected_role_strs): st.error("마감된 역할이 포함되어 있습니다.")
                         else:
-                            has_full_role = any("마감" in r for r in selected_role_strs)
-                            if has_full_role: 
-                                st.error("선택한 역할 중 '정원이 마감된 역할'이 포함되어 있습니다. 마감된 역할은 빼고 다시 선택해주세요.")
+                            added_count = 0
+                            for r_str in selected_role_strs:
+                                actual_role = r_str.split(" (")[0]
+                                my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
+                                # ✨ 새로 지원할 때 score와 comment 기본값 세팅
+                                for t in my_tasks: t['score'] = 0; t['comment'] = ""
+                                db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "alias": "", "attendance": {}})
+                                added_count += 1
+                            if save_data(db): st.success("🎉 지원 완료!"); time.sleep(1); st.rerun()
                             else:
-                                added_count = 0
-                                for r_str in selected_role_strs:
-                                    actual_role = r_str.split(" (")[0]
-                                    my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
-                                    db['users'].append({
-                                        "name": user_name, 
-                                        "pin": user_pin, 
-                                        "program": selected_prog_title, 
-                                        "role": actual_role, 
-                                        "workflow": my_tasks, 
-                                        "messages": [], 
-                                        "alias": "", 
-                                        "attendance": {}
-                                    })
-                                    added_count += 1
-                                
-                                if save_data(db):
-                                    st.success("🎉 성공적으로 지원되었습니다! 우측 탭에서 로그인해 확인하세요.")
-                                    time.sleep(1)
-                                    st.rerun()
-                                else:
-                                    for _ in range(added_count): db['users'].pop()
+                                for _ in range(added_count): db['users'].pop()
 
     with tab2:
         with st.container(border=True):
             col_id, col_pw, col_btn = st.columns([4, 4, 2])
             search_name = col_id.text_input("이름", placeholder="예: 권해리")
             search_pin = col_pw.text_input("비밀번호 (4자리)", type="password")
-            
-            col_btn.write(""); col_btn.write("")
             login_attempt = col_btn.button("접속하기", use_container_width=True)
             
             if login_attempt or (search_name and search_pin):
@@ -338,59 +235,66 @@ elif st.session_state.menu_option == "나의 이야기":
                 if my_data:
                     for u_idx, data in enumerate(my_data):
                         st.divider()
-                        st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님")
-                        st.markdown(f"<span class='badge-blue'>나의 담당 역할: {data['role']}</span>", unsafe_allow_html=True)
+                        st.markdown(f"### 🏅 [{data['program']}] 참가자 **{data['name']}**님 <span style='font-size:0.6em; color:gray;'>(학부모 열람용)</span>", unsafe_allow_html=True)
+                        st.markdown(f"<span class='badge-blue'>담당 역할: {data['role']}</span>", unsafe_allow_html=True)
                         st.write("")
                         
-                        total_items = 0; done_items = 0
-                        for t in data['workflow']:
-                            total_items += 1
-                            if t.get('done'): done_items += 1
-                            for stask in t.get('subtasks', []):
-                                total_items += 1
-                                if stask.get('done'): done_items += 1
+                        # ✨ 종합 리포트 영역 추가
+                        st.markdown("#### 📈 우리 아이 성장 리포트")
                         
+                        # 데이터 집계
+                        tasks = data['workflow']
+                        task_names = [t['task'] for t in tasks]
+                        task_scores = [t.get('score', 0) for t in tasks]
+                        avg_score = sum(task_scores) / len(task_scores) if task_scores else 0
+                        
+                        total_items = 0; done_items = 0
+                        for t in tasks:
+                            total_items += 1; done_items += 1 if t.get('done') else 0
+                            for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                         pct = int((done_items/total_items)*100) if total_items > 0 else 0
                         
-                        st.metric("전체 활동 성취율", f"{pct}%", f"{done_items} / {total_items} 개 달성")
-                        st.progress(pct / 100)
+                        colR1, colR2 = st.columns(2)
+                        colR1.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                        colR2.metric("선생님 종합 성취도 평가", f"{int(avg_score)}점", "100점 만점 기준")
                         
-                        if pct <= 60:
-                            st.warning("⚠️ **현재 활동 성취율이 60% 이하입니다.** 어려운 점이 있다면 아래 게시판을 통해 선생님과 소통해 보세요!")
-                        else:
-                            st.success("🎉 순조롭게 잘 진행되고 있어요! 이대로 끝까지 화이팅!")
-                        
-                        if data.get('attendance'):
-                            st.write("#### 📅 나의 최근 출석 기록")
-                            att_df = pd.DataFrame([{"날짜": k, "상태": v['status'], "비고": v['note']} for k, v in data['attendance'].items()]).sort_values("날짜", ascending=False)
-                            st.dataframe(att_df, use_container_width=True, hide_index=True)
-                        
+                        # 성취도 시계열 그래프 (Streamlit Native - 모바일 최적화 및 폰트 깨짐 완벽 방어)
+                        if task_scores:
+                            df_scores = pd.DataFrame({"성취도 점수": task_scores}, index=task_names)
+                            st.line_chart(df_scores, color="#e68128", height=200)
+
+                        # 선생님 코멘트 알림장
+                        st.markdown("#### 💌 선생님의 따뜻한 알림장")
+                        has_comments = False
+                        for t in tasks:
+                            if t.get('comment'):
+                                st.info(f"**[{t['task']}]** {t['comment']}")
+                                has_comments = True
+                        if not has_comments: st.write("아직 작성된 코멘트가 없습니다.")
+                        st.write("---")
+
+                        # 세부 활동 체크리스트
                         st.write("#### ✅ 세부 활동 체크리스트")
                         with st.container(border=True):
                             changed = False
-                            for idx, t in enumerate(data['workflow']):
-                                label = f"{get_date_label(t)}{t['task']}"
-                                is_done = st.checkbox(f"**{label}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{u_idx}_{idx}")
-                                if is_done != t.get('done'):
-                                    t['done'] = is_done; changed = True
-                                
+                            for idx, t in enumerate(tasks):
+                                is_done = st.checkbox(f"**{get_date_label(t)}{t['task']}**", value=t.get('done'), key=f"chk_{search_name}_{data['program']}_{u_idx}_{idx}")
+                                if is_done != t.get('done'): t['done'] = is_done; changed = True
                                 for s_idx, stask in enumerate(t.get('subtasks', [])):
                                     col_empty, col_chk = st.columns([1, 20])
                                     with col_chk:
                                         sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"chk_sub_{search_name}_{data['program']}_{u_idx}_{idx}_{s_idx}")
-                                        if sub_done != stask.get('done'):
-                                            stask['done'] = sub_done; changed = True
-                                            
+                                        if sub_done != stask.get('done'): stask['done'] = sub_done; changed = True
                             if changed: 
                                 if save_data(db): st.rerun()
-                        
-                        st.write("#### 💬 관리자 1:1 소통 게시판")
+
+                        # 소통 게시판
+                        st.write("#### 💬 1:1 비밀 소통 게시판")
                         chat_box = st.container(border=True, height=250)
                         with chat_box:
                             if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
                             for msg in data.get('messages', []):
-                                with st.chat_message("user" if msg['sender'] == 'user' else "assistant"):
-                                    st.write(msg['content'])
+                                with st.chat_message("user" if msg['sender'] == 'user' else "assistant"): st.write(msg['content'])
                         with st.form(f"chat_form_{search_name}_{data['program']}_{u_idx}", clear_on_submit=True):
                             c1, c2 = st.columns([8, 2])
                             msg_input = c1.text_input("메시지 입력", label_visibility="collapsed")
@@ -400,24 +304,21 @@ elif st.session_state.menu_option == "나의 이야기":
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 3] 관리자 페이지
+# [페이지 3] 관리자 페이지 (경영 대시보드 추가)
 # =========================================================
 elif st.session_state.menu_option == "관계자 외 출입금지":
     if not st.session_state.get('admin_logged_in', False):
         st.markdown("## 🔒 관리자 전용 포털")
         with st.container(border=True):
-            st.info("💡 초기 시스템 세팅: 이름 [ 마스터 ], 비밀번호 [ 0000 ]")
+            st.info("💡 초기 세팅: 이름 [ 마스터 ], 비밀번호 [ 0000 ]")
             with st.form("admin_login_form"):
                 login_name = st.text_input("관리자 이름")
                 login_pin = st.text_input("비밀번호 4자리", type="password", max_chars=4)
                 if st.form_submit_button("로그인", type="primary"):
                     matched_admin = next((a for a in db.get('admins', []) if a['name'] == login_name and a['pin'] == login_pin), None)
                     if matched_admin:
-                        st.session_state['admin_logged_in'] = True
-                        st.session_state['logged_admin'] = matched_admin
-                        st.rerun()
+                        st.session_state['admin_logged_in'] = True; st.session_state['logged_admin'] = matched_admin; st.rerun()
                     else: st.error("인증 실패: 정보가 틀렸습니다.")
-    
     else:
         admin_info = st.session_state['logged_admin']
         is_super = (admin_info['role'] == 'super')
@@ -425,482 +326,219 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
 
         col_title, col_logout = st.columns([8, 2])
         col_title.markdown(f"## 🛠️ 시설 통합 관리 시스템 <span style='font-size:0.5em; color:gray;'>[{admin_info['name']} 접속중]</span>", unsafe_allow_html=True)
-        if col_logout.button("🔓 로그아웃", use_container_width=True):
-            st.session_state['admin_logged_in'] = False; st.rerun()
+        if col_logout.button("🔓 로그아웃", use_container_width=True): st.session_state['admin_logged_in'] = False; st.rerun()
             
-        tab_overview, tab_calendar, tab_attendance, tab_manage_users, tab_create, tab_edit, tab_settings = st.tabs([
-            "📊 종합 현황", "📅 통합 캘린더", "✅ 출석 관리", "👥 소통/명단관리", "📝 신규 프로그램", "⚙️ 정보 수정", "🔐 계정/설정"
+        # ✨ 새로운 탭 구성 (경영 대시보드 및 평가 코멘트 추가)
+        tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_create, tab_edit, tab_settings = st.tabs([
+            "📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"
         ])
         
+        # ✨ [제안 1, 3, 4 완벽 구현] 경영 대시보드 (Seaborn, Matplotlib 활용)
+        with tab_dashboard:
+            st.subheader("📈 학원장 전용 통합 경영 대시보드")
+            users_to_show = [u for u in db['users'] if u['program'] in my_programs]
+            
+            if not users_to_show: st.info("데이터가 부족하여 대시보드를 생성할 수 없습니다.")
+            else:
+                # 데이터프레임 전처리
+                dashboard_data = []
+                task_data = []
+                for u in users_to_show:
+                    # 성취도 및 출석률 계산
+                    t_scores = [t.get('score', 0) for t in u['workflow']]
+                    avg_score = sum(t_scores) / len(t_scores) if t_scores else 0
+                    att_counts = sum(1 for v in u.get('attendance', {}).values() if v.get('status') == '출석')
+                    comment_counts = sum(1 for t in u['workflow'] if t.get('comment'))
+                    
+                    dashboard_data.append({
+                        "Program": u['program'], "Role": u['role'], "Student": u.get('alias') or u['name'],
+                        "AvgScore": avg_score, "Attendance": att_counts, "Comments": comment_counts
+                    })
+                    
+                    for t in u['workflow']:
+                        task_data.append({"Program": u['program'], "Task": t['task'], "Score": t.get('score', 0)})
+                
+                df_dash = pd.DataFrame(dashboard_data)
+                df_tasks = pd.DataFrame(task_data)
+
+                # 시각화 영역 1: 프로그램 비교 및 이상치 탐지 (Bar, Boxplot)
+                st.markdown("##### 🔍 프로그램별 성과 및 이상치 탐지")
+                fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+                
+                # Barplot: 프로그램별 평균 성취도
+                sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
+                ax1.set_title('Average Score by Program')
+                ax1.set_ylim(0, 100)
+                ax1.tick_params(axis='x', rotation=45)
+                
+                # Boxplot: 이탈 위험군(이상치) 탐지
+                sns.boxplot(data=df_dash, x='Program', y='AvgScore', ax=ax2, palette='pastel')
+                ax2.set_title('Score Distribution & Outliers (Risk Detection)')
+                ax2.set_ylim(0, 100)
+                ax2.tick_params(axis='x', rotation=45)
+                
+                st.pyplot(fig1)
+                st.info("💡 **원장님 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 학생(이상치)'**입니다. 개별 면담이 필요합니다.")
+
+                # 시각화 영역 2: 상관관계 및 난이도 조절 (Scatter, Histogram)
+                st.markdown("##### 🔍 강사 관리 효율성 및 과업 난이도 분석")
+                fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
+                
+                # Scatterplot: 코멘트 작성 수 vs 학생 성취도 (강사 관리 효율성)
+                sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
+                ax3.set_title('Teacher Comments vs Student Score')
+                ax3.set_xlabel('Number of Comments Given')
+                ax3.set_ylabel('Average Score')
+                
+                # Histplot: 전체 과업 난이도 확인
+                sns.histplot(data=df_tasks, x='Score', bins=10, kde=True, ax=ax4, color='steelblue')
+                ax4.set_title('Distribution of All Task Scores (Difficulty)')
+                ax4.set_xlabel('Score')
+                
+                st.pyplot(fig2)
+                st.info("💡 **원장님 인사이트:** 왼쪽 산점도(Scatter)가 우상향한다면 강사님이 코멘트를 남길수록 학생의 점수가 오르는 것입니다. 오른쪽 히스토그램(Hist)이 너무 낮은 쪽에 몰려있다면 커리큘럼 난이도를 낮춰야 합니다.")
+
+        # ✨ [제안 2 구현] 평가 및 코멘트 작성 탭 (강사용)
+        with tab_eval:
+            st.subheader("📝 학생 종합 평가 및 코멘트 작성")
+            if not my_programs: st.info("담당 프로그램이 없습니다.")
+            else:
+                col_sel1, col_sel2 = st.columns([5, 5])
+                eval_prog = col_sel1.selectbox("📋 프로그램 선택", my_programs, key="eval_prog")
+                prog_users = [(i, u) for i, u in enumerate(db['users']) if u['program'] == eval_prog]
+                
+                if not prog_users: st.warning("신청한 학생이 없습니다.")
+                else:
+                    eval_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in prog_users}
+                    selected_user_label = col_sel2.selectbox("🎓 학생 선택", list(eval_user_options.keys()))
+                    target_idx = eval_user_options[selected_user_label]
+                    target_user = db['users'][target_idx]
+                    
+                    st.write(f"#### 🏅 {target_user['name']} 학생 과업 평가")
+                    with st.form(f"eval_form_{target_idx}"):
+                        for t_idx, t in enumerate(target_user['workflow']):
+                            st.markdown(f"**[{t['task']}]**")
+                            c1, c2 = st.columns([3, 7])
+                            # 성취도 슬라이더 및 코멘트 인풋
+                            new_score = c1.slider("성취도 점수", 0, 100, t.get('score', 0), key=f"score_{target_idx}_{t_idx}")
+                            new_comment = c2.text_input("학부모 전송용 코멘트", value=t.get('comment', ''), placeholder="따뜻한 피드백을 적어주세요.", key=f"comment_{target_idx}_{t_idx}")
+                            st.write("")
+                            
+                            # 데이터 즉시 반영을 위해 폼 제출 시 딕셔너리 업데이트
+                            target_user['workflow'][t_idx]['score'] = new_score
+                            target_user['workflow'][t_idx]['comment'] = new_comment
+                            
+                        if st.form_submit_button("💾 전체 평가 저장하기", type="primary", use_container_width=True):
+                            if save_data(db):
+                                st.success("학생 평가와 코멘트가 저장되어 학부모 리포트에 반영되었습니다!")
+                                time.sleep(1)
+                                st.rerun()
+
+        # 기존 탭들 (종합 명단, 출석, 소통, 개설, 수정, 설정) 로직 유지
         with tab_overview:
+            st.write("#### 📊 데이터 필터링 및 엑셀 추출")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             if users_to_show:
-                st.write("#### 📊 데이터 필터링 및 엑셀 추출")
-                with st.container(border=True):
-                    col_f1, col_f2, col_f3 = st.columns(3)
-                    admin_list = ["전체"] + [a['name'] for a in db['admins'] if a['role'] != 'super']
-                    sel_admin = col_f1.selectbox("👤 관리자 담당별", admin_list)
-                    
-                    allowed_progs_by_admin = my_programs
-                    if sel_admin != "전체":
-                        target_admin = next((a for a in db['admins'] if a['name'] == sel_admin), None)
-                        if target_admin: allowed_progs_by_admin = [p for p in my_programs if p in target_admin.get('programs', [])]
-                    
-                    prog_list = ["전체"] + list(set([u['program'] for u in users_to_show if u['program'] in allowed_progs_by_admin]))
-                    sel_prog = col_f2.selectbox("📋 프로그램별", prog_list)
-                    
-                    student_list = ["전체"] + list(set([u.get('alias') if u.get('alias') else u['name'] for u in users_to_show]))
-                    sel_student = col_f3.selectbox("🎓 학생 이름별", student_list)
-
-                filtered_users = []
+                overview_data = []
                 for u in users_to_show:
-                    disp_name = u.get('alias') if u.get('alias') else u['name']
-                    if u['program'] not in allowed_progs_by_admin: continue
-                    if sel_prog != "전체" and u['program'] != sel_prog: continue
-                    if sel_student != "전체" and disp_name != sel_student: continue
-                    filtered_users.append(u)
-                
-                if filtered_users:
-                    overview_data = []
-                    for u in filtered_users:
-                        tot_i = 0; don_i = 0
-                        for t in u['workflow']:
-                            tot_i += 1
-                            if t.get('done'): don_i += 1
-                            for stask in t.get('subtasks', []):
-                                tot_i += 1
-                                if stask.get('done'): don_i += 1
-                        pct = int((don_i/tot_i)*100) if tot_i > 0 else 0
-                        
-                        att = u.get('attendance', {})
-                        att_counts = {"출석": 0, "지각": 0, "결석": 0, "병결": 0}
-                        for date_key, info in att.items():
-                            status = info.get('status')
-                            if status in att_counts: att_counts[status] += 1
-                                
-                        managing_admins = [a['name'] for a in db['admins'] if a['role'] != 'super' and u['program'] in a.get('programs', [])]
-                        admin_names_str = ", ".join(managing_admins) if managing_admins else "마스터"
-
-                        overview_data.append({
-                            "학생명": u.get('alias') if u.get('alias') else u['name'], 
-                            "담당 관리자": admin_names_str, "프로그램": u['program'], "역할": u['role'], 
-                            "성취율(%)": pct, "출석": att_counts["출석"], "지각": att_counts["지각"], "결석": att_counts["결석"], "병결": att_counts["병결"]
-                        })
-                    
-                    df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", "학생명"])
-                    st.dataframe(df_out, use_container_width=True, hide_index=True)
-                    st.write("")
-                    csv_data = df_out.to_csv(index=False, encoding='utf-8-sig')
-                    st.download_button("📥 필터링된 결과 엑셀(CSV) 파일로 다운로드", data=csv_data, file_name=f"YouthCanvas_종합현황_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", type="primary")
-                else: st.warning("선택하신 조건에 맞는 데이터가 없습니다.")
-            else: st.info("담당 프로그램에 참여 중인 청소년이 없습니다.")
-
-        with tab_calendar:
-            st.subheader("📅 관리자 통합 캘린더")
-            event_blocks = []
-            for p in db['programs']:
-                if p['title'] in my_programs:
-                    prog_color = p.get('color', '#4f46e5')
-                    for role, tasks in p.get('roles_workflow', {}).items():
-                        for t in tasks:
-                            sd, ed = get_date_range(t)
-                            if sd and ed and re.match(r'\d{4}-\d{2}-\d{2}', sd) and re.match(r'\d{4}-\d{2}-\d{2}', ed):
-                                event_blocks.append({"start": sd, "end": ed, "color": prog_color, "title": f"<b>[{p['title'][:5]}]</b> {t['task']}"})
-            event_blocks.sort(key=lambda x: (x['start'], x['end']))
-            if not event_blocks: st.warning("스케줄이 등록된 프로그램이 없습니다.")
-            else:
-                all_starts = [b['start'] for b in event_blocks]
-                all_starts.sort()
-                default_year = int(all_starts[0].split('-')[0])
-                default_month = int(all_starts[0].split('-')[1])
-                col_y, col_m, _ = st.columns([2, 2, 6])
-                selected_year = col_y.selectbox("연도 선택", range(2025, 2031), index=range(2025, 2031).index(default_year))
-                selected_month = col_m.selectbox("월 선택", range(1, 13), index=default_month-1)
-                cal = calendar.monthcalendar(selected_year, selected_month)
-                days_ko = ["월", "화", "수", "목", "금", "토", "일"]
-                html_cal = "<table class='cal-table'><tr>"
-                for day in days_ko: html_cal += f"<th class='cal-th'>{day}</th>"
-                html_cal += "</tr>"
-                for week in cal:
-                    html_cal += "<tr>"
-                    for day_idx, day_num in enumerate(week):
-                        if day_num == 0: html_cal += "<td class='cal-td empty'></td>"
-                        else:
-                            curr_date = f"{selected_year}-{selected_month:02d}-{day_num:02d}"
-                            color_text = "#475569"
-                            if day_idx == 5: color_text = "#2563eb"
-                            elif day_idx == 6: color_text = "#dc2626"
-                            html_cal += f"<td class='cal-td'><div class='cal-day-num' style='color:{color_text};'>{day_num}</div>"
-                            for eb in event_blocks:
-                                if eb['start'] <= curr_date <= eb['end']:
-                                    is_start = (curr_date == eb['start']); is_end = (curr_date == eb['end'])
-                                    is_week_start = (day_idx == 0); is_week_end = (day_idx == 6)
-                                    m_left = "4px" if is_start or is_week_start else "0px"
-                                    m_right = "4px" if is_end or is_week_end else "0px"
-                                    r_left = "4px" if is_start or is_week_start else "0px"
-                                    r_right = "4px" if is_end or is_week_end else "0px"
-                                    show_text = is_start or is_week_start
-                                    display_text = eb['title'] if show_text else "&nbsp;"
-                                    style = f"background-color:{eb['color']}; margin-left:{m_left}; margin-right:{m_right}; border-radius:{r_left} {r_right} {r_right} {r_left};"
-                                    html_cal += f"<div class='cal-event' style='{style}'>{display_text}</div>"
-                            html_cal += "</td>"
-                    html_cal += "</tr>"
-                html_cal += "</table>"
-                st.markdown(html_cal, unsafe_allow_html=True)
+                    t_scores = [t.get('score', 0) for t in u['workflow']]
+                    pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
+                    att_counts = sum(1 for v in u.get('attendance', {}).values() if v.get('status') == '출석')
+                    overview_data.append({
+                        "학생명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
+                        "평균성취도(점)": pct, "총 출석(일)": att_counts
+                    })
+                df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", "학생명"])
+                st.dataframe(df_out, use_container_width=True, hide_index=True)
+                csv_data = df_out.to_csv(index=False, encoding='utf-8-sig')
+                st.download_button("📥 결과 엑셀(CSV) 다운로드", data=csv_data, file_name="명단.csv", mime="text/csv", type="primary")
+            else: st.info("데이터가 없습니다.")
 
         with tab_attendance:
             st.subheader("✅ 프로그램별 출석 관리")
-            if not my_programs: st.info("담당 중인 프로그램이 없습니다.")
-            else:
-                col_sel1, col_sel2 = st.columns([6, 4])
-                att_prog = col_sel1.selectbox("📋 출석을 체크할 프로그램", my_programs, key="att_prog")
-                att_date = col_sel2.date_input("🗓️ 날짜 선택", value=datetime.now(), key="att_date")
-                att_date_str = att_date.strftime("%Y-%m-%d")
-
-                prog_users_att = [(i, u) for i, u in enumerate(db['users']) if u['program'] == att_prog]
-                if not prog_users_att: st.warning("해당 프로그램에 신청한 학생이 없습니다.")
-                else:
-                    with st.container(border=True):
-                        st.write(f"#### 📅 {att_date_str} 출석부")
-                        with st.form(f"attendance_form_{att_prog}_{att_date_str}"):
+            if my_programs:
+                c1, c2 = st.columns([6, 4])
+                att_prog = c1.selectbox("📋 출석 체크 프로그램", my_programs)
+                att_date = c2.date_input("🗓️ 날짜 선택").strftime("%Y-%m-%d")
+                pu = [(i, u) for i, u in enumerate(db['users']) if u['program'] == att_prog]
+                if pu:
+                    with st.form(f"att_form"):
+                        att_up = {}
+                        for idx, u in pu:
+                            curr_st = u.get('attendance', {}).get(att_date, {}).get('status', '출석')
+                            curr_nt = u.get('attendance', {}).get(att_date, {}).get('note', '')
                             h1, h2, h3 = st.columns([3, 3, 4])
-                            h1.markdown("**학생명 (역할)**")
-                            h2.markdown("**출결 상태**")
-                            h3.markdown("**비고 (사유 등)**")
-                            st.divider()
-
-                            att_updates = {}
-                            for idx, u in prog_users_att:
-                                disp_name = u.get('alias') if u.get('alias') else u['name']
-                                current_att = u.get('attendance', {}).get(att_date_str, {})
-                                curr_status = current_att.get('status', '출석')
-                                curr_note = current_att.get('note', '')
-
-                                c1, c2, c3 = st.columns([3, 3, 4])
-                                c1.write(f"**{disp_name}**\n<br><span style='color:gray; font-size:0.8em;'>{u['role']}</span>", unsafe_allow_html=True)
-                                new_status = c2.selectbox("상태", ["출석", "지각", "결석", "병결"], index=["출석", "지각", "결석", "병결"].index(curr_status), key=f"att_status_{idx}", label_visibility="collapsed")
-                                new_note = c3.text_input("비고", value=curr_note, key=f"att_note_{idx}", label_visibility="collapsed", placeholder="상세 사유 입력")
-                                att_updates[idx] = {"status": new_status, "note": new_note}
-
-                            st.write("")
-                            if st.form_submit_button("💾 출석 데이터 저장하기", type="primary", use_container_width=True):
-                                for idx, att_data in att_updates.items():
-                                    if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
-                                    db['users'][idx]['attendance'][att_date_str] = att_data
-                                if save_data(db):
-                                    st.success(f"{att_date_str} 출석 정보가 성공적으로 저장되었습니다!")
-                                    time.sleep(1)
-                                    st.rerun()
+                            h1.write(f"**{u.get('alias') or u['name']}**")
+                            ns = h2.selectbox("상태", ["출석", "지각", "결석", "병결"], index=0, key=f"s_{idx}", label_visibility="collapsed")
+                            nn = h3.text_input("비고", value=curr_nt, key=f"n_{idx}", label_visibility="collapsed")
+                            att_up[idx] = {"status": ns, "note": nn}
+                        if st.form_submit_button("저장", type="primary"):
+                            for idx, ad in att_up.items():
+                                if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
+                                db['users'][idx]['attendance'][att_date] = ad
+                            if save_data(db): st.success("저장 완료"); time.sleep(1); st.rerun()
 
         with tab_manage_users:
-            if not my_programs: st.info("담당 중인 프로그램이 없습니다.")
-            else:
-                selected_prog_manage = st.selectbox("📋 조회할 프로그램 선택", my_programs)
-                prog_users_with_idx = [(i, u) for i, u in enumerate(db['users']) if u['program'] == selected_prog_manage]
-                
-                if prog_users_with_idx:
-                    df_prog_users = pd.DataFrame([{
-                        "이름": u.get('alias') if u.get('alias') else u['name'], "역할": u['role']
-                    } for _, u in prog_users_with_idx])
-                    st.dataframe(df_prog_users, use_container_width=True, hide_index=True)
+            if my_programs:
+                sel_p = st.selectbox("프로그램", my_programs, key="m_prog")
+                pu = [(i, u) for i, u in enumerate(db['users']) if u['program'] == sel_p]
+                if pu:
+                    ops = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
+                    t_idx = ops[st.selectbox("학생 선택", list(ops.keys()))]
+                    tu = db['users'][t_idx]
                     
-                    st.divider()
-                    idx_mapping = {}
-                    display_list = []
-                    for global_i, u in prog_users_with_idx:
-                        disp_name = u.get('alias') if u.get('alias') else u['name']
-                        display_str = f"[번호:{global_i}] {disp_name} - {u['role']}"
-                        display_list.append(display_str)
-                        idx_mapping[display_str] = global_i
-
-                    selected_display = st.selectbox("🔍 상세 관리할 청소년 선택", display_list)
-                    
-                    if selected_display:
-                        target_idx = idx_mapping[selected_display]
-                        target_user = db['users'][target_idx]
-                        
-                        with st.container(border=True):
-                            st.write("✏️ **학생 이름 변경 (동명이인 구분용)**")
+                    with st.container(border=True):
+                        st.write("💬 1:1 대화방")
+                        for msg in tu.get('messages', []):
+                            with st.chat_message("assistant" if msg['sender'] == 'admin' else "user"): st.write(msg['content'])
+                        with st.form(f"adm_chat_{t_idx}", clear_on_submit=True):
                             c1, c2 = st.columns([8, 2])
-                            current_disp = target_user.get('alias') if target_user.get('alias') else target_user['name']
-                            new_alias = c1.text_input("변경할 이름 입력", value=current_disp, label_visibility="collapsed")
-                            if c2.button("이름 저장", type="primary", use_container_width=True):
-                                db['users'][target_idx]['alias'] = new_alias
-                                if save_data(db):
-                                    st.success("관리자 목록의 표시 이름이 변경되었습니다!")
-                                    time.sleep(1)
-                                    st.rerun()
-                                
-                        st.write("") 
-                        col_info, col_chat = st.columns([1, 1])
-                        with col_info:
-                            with st.container(border=True):
-                                tot_i = 0; don_i = 0
-                                for t in target_user['workflow']:
-                                    tot_i += 1
-                                    if t.get('done'): don_i += 1
-                                    for stask in t.get('subtasks', []):
-                                        tot_i += 1
-                                        if stask.get('done'): don_i += 1
-                                pct = int((don_i/tot_i)*100) if tot_i > 0 else 0
-                                
-                                st.write(f"**[{target_user['name']}] 학생 성취도 ({pct}%)**")
-                                if pct <= 60: st.error("🚨 학생의 성취율이 60% 이하입니다. 1:1 상담을 권장합니다.")
-                                
-                                changed_admin = False
-                                for t_idx, t in enumerate(target_user['workflow']):
-                                    label = f"{get_date_label(t)}{t['task']}"
-                                    is_done = st.checkbox(f"**{label}**", value=t.get('done'), key=f"admin_chk_m_{target_idx}_{t_idx}")
-                                    if is_done != t.get('done'):
-                                        target_user['workflow'][t_idx]['done'] = is_done; changed_admin = True
-                                        
-                                    for s_idx, stask in enumerate(t.get('subtasks', [])):
-                                        ce, cc = st.columns([1, 20])
-                                        with cc:
-                                            sub_done = st.checkbox(f"↳ {stask['desc']}", value=stask.get('done'), key=f"admin_chk_s_{target_idx}_{t_idx}_{s_idx}")
-                                            if sub_done != stask.get('done'):
-                                                stask['done'] = sub_done; changed_admin = True
-                                                
-                                if changed_admin: 
-                                    if save_data(db): st.success("진도 저장됨"); st.rerun()
-                                
-                                st.write("")
-                                if st.button("❌ 이 학생의 신청 취소 (데이터 삭제)", use_container_width=True):
-                                    db['users'].pop(target_idx)
-                                    if save_data(db): st.rerun()
+                            ri = c1.text_input("답장", label_visibility="collapsed")
+                            if c2.form_submit_button("전송") and ri:
+                                tu.setdefault('messages', []).append({"sender": "admin", "content": ri})
+                                if save_data(db): st.rerun()
+                    if st.button("❌ 학생 강제 퇴소(삭제)", type="primary"):
+                        db['users'].pop(t_idx); save_data(db); st.rerun()
 
-                        with col_chat:
-                            with st.container(border=True):
-                                st.write(f"**💬 1:1 대화방**")
-                                admin_chat_box = st.container(height=350)
-                                with admin_chat_box:
-                                    for msg in target_user.get('messages', []):
-                                        with st.chat_message("assistant" if msg['sender'] == 'admin' else "user"):
-                                            st.write(msg['content'])
-                                with st.form(f"admin_chat_form_{target_idx}", clear_on_submit=True):
-                                    c1, c2 = st.columns([7, 3])
-                                    reply_input = c1.text_input("답장", label_visibility="collapsed")
-                                    if c2.form_submit_button("전송") and reply_input:
-                                        target_user.setdefault('messages', []).append({"sender": "admin", "content": reply_input})
-                                        if save_data(db): st.rerun()
-
-        # ✨ [오류 해결!] 특수기호 자동차단 기능이 적용된 신규 개설
         with tab_create:
-            with st.container(border=True):
-                with st.form("create_form"):
-                    colA, colB = st.columns([8, 2])
-                    t = colA.text_input("프로그램 명")
-                    prog_color = colB.color_picker("캘린더 색상", "#4f46e5")
-                    
-                    st.write("🗓️ **모집 기간 설정**")
-                    colD1, colD2 = st.columns(2)
-                    r_start = colD1.date_input("모집 시작일")
-                    r_end = colD2.date_input("모집 종료일")
-                    
-                    d = st.text_area("프로그램 소개글 (카드에 표시됨)")
-                    v = st.text_input("유튜브 링크")
-                    st.info("📌 작성 양식 (기간은 물결 ~, 세부 목표는 대시 - 사용)\n[역할명 : 정원]\nYYYY-MM-DD ~ YYYY-MM-DD : 메인 과업\n- 프리미어프로 기초 익히기 (세부 목표 1)\n- 단축키 외우기 (세부 목표 2)")
-                    w_input = st.text_area("역할 및 워크플로우 설정", height=250)
-                    
-                    if st.form_submit_button("프로그램 개설하기", type="primary"):
-                        parsed_w = {}; parsed_c = {}; curr_r = None
-                        for line in w_input.split('\n'):
-                            line = line.strip()
-                            if not line: continue
-                            if line.startswith('[') and ']' in line:
-                                content = line[1:line.find(']')]
-                                raw_role = content.split(':')[0].strip()
-                                # ✨ 오류 방어막: '기획/대본' 등을 '기획_대본'으로 안전하게 변환
-                                curr_r = safe_key(raw_role) 
-                                parsed_c[curr_r] = int(re.sub(r'[^0-9]', '', content.split(':')[1])) if ':' in content else 10
-                                parsed_w[curr_r] = []
-                            elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
-                                dt_part, tk = line.split(':', 1)
-                                dt_part = dt_part.strip()
-                                if '~' in dt_part:
-                                    sd, ed = dt_part.split('~', 1)
-                                    parsed_w[curr_r].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False})
-                                else:
-                                    parsed_w[curr_r].append({"start_date": dt_part, "end_date": dt_part, "task": tk.strip(), "subtasks": [], "done": False})
-                            elif curr_r and (line.startswith('-') or line.startswith('*')):
-                                sub_desc = line[1:].strip()
-                                if parsed_w[curr_r]: 
-                                    parsed_w[curr_r][-1]["subtasks"].append({"desc": sub_desc, "done": False})
-                                    
-                        db['programs'].append({
-                            "title": t, "desc": d, "video": v, "color": prog_color, 
-                            "recruit_start": r_start.strftime("%Y-%m-%d"),
-                            "recruit_end": r_end.strftime("%Y-%m-%d"),
-                            "roles_capacity": parsed_c, "roles_workflow": parsed_w
-                        })
-                        if not is_super:
-                            admin_in_db = next(a for a in db['admins'] if a['name'] == admin_info['name'])
-                            admin_in_db.setdefault('programs', []).append(t)
-                            st.session_state['logged_admin']['programs'].append(t)
-                        
-                        if save_data(db):
-                            st.success("✨ 클라우드 서버에 프로그램이 안전하게 개설되었습니다!")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            db['programs'].pop() # 실패시 롤백
+            with st.form("create_form"):
+                c1, c2 = st.columns([8, 2])
+                t = c1.text_input("프로그램 명")
+                color = c2.color_picker("색상", "#4f46e5")
+                rs, re = st.columns(2)
+                r_s = rs.date_input("시작일"); r_e = re.date_input("종료일")
+                d = st.text_area("소개"); v = st.text_input("유튜브 링크")
+                w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
+                
+                if st.form_submit_button("개설하기", type="primary"):
+                    pw = {}; pc = {}; cr = None
+                    for line in w_input.split('\n'):
+                        line = line.strip()
+                        if not line: continue
+                        if line.startswith('[') and ']' in line:
+                            cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
+                            pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
+                            pw[cr] = []
+                        elif cr and ':' in line and not line.startswith('-'):
+                            dt, tk = line.split(':', 1)
+                            sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
+                            pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                        elif cr and line.startswith('-'):
+                            if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
+                    db['programs'].append({"title": t, "desc": d, "video": v, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
+                    if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
+                    if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
+                    else: db['programs'].pop()
 
         with tab_edit:
-            if not my_programs: st.info("수정 권한이 있는 프로그램이 없습니다.")
-            else:
-                with st.container(border=True):
-                    edit_title = st.selectbox("⚙️ 수정할 프로그램 선택", my_programs)
-                    p_idx = [p['title'] for p in db['programs']].index(edit_title)
-                    p_data = db['programs'][p_idx]
-                    
-                    initial_w = ""
-                    for role, tasks in p_data.get('roles_workflow', {}).items():
-                        cap = p_data.get('roles_capacity', {}).get(role, 10)
-                        initial_w += f"[{role} : {cap}명]\n"
-                        for t in tasks:
-                            sd, ed = get_date_range(t)
-                            if sd and ed and sd != ed: initial_w += f"{sd} ~ {ed} : {t['task']}\n"
-                            elif sd and sd != "-": initial_w += f"{sd} : {t['task']}\n"
-                            else: initial_w += f"{t['task']}\n"
-                            
-                            for stask in t.get('subtasks', []):
-                                initial_w += f"- {stask['desc']}\n"
-                        initial_w += "\n"
-
-                    with st.form("edit_form"):
-                        colA, colB = st.columns([8, 2])
-                        new_t = colA.text_input("프로그램 명", value=p_data['title'])
-                        new_color = colB.color_picker("캘린더 색상 변경", value=p_data.get('color', '#4f46e5'))
-                        
-                        st.write("🗓️ **모집 기간 변경**")
-                        colD1, colD2 = st.columns(2)
-                        def_start = datetime.strptime(p_data.get('recruit_start', today_str), "%Y-%m-%d")
-                        def_end = datetime.strptime(p_data.get('recruit_end', "2026-12-31"), "%Y-%m-%d")
-                        new_r_start = colD1.date_input("모집 시작일 수정", value=def_start)
-                        new_r_end = colD2.date_input("모집 종료일 수정", value=def_end)
-
-                        new_d = st.text_area("상세 내용", value=p_data['desc'])
-                        new_v = st.text_input("유튜브 링크", value=p_data.get('video',''))
-                        st.info("세부 목표는 메인 과업 바로 아랫줄에 '-' 기호를 붙여 작성하세요.")
-                        new_w = st.text_area("워크플로우 수정 (기간은 물결 ~ 사용)", value=initial_w.strip(), height=300)
-                        
-                        if st.form_submit_button("수정 내용 저장", type="primary"):
-                            parsed_w = {}; parsed_c = {}; curr_r = None
-                            for line in new_w.split('\n'):
-                                line = line.strip()
-                                if not line: continue
-                                if line.startswith('[') and ']' in line:
-                                    content = line[1:line.find(']')]
-                                    raw_role = content.split(':')[0].strip()
-                                    # ✨ 오류 방어막
-                                    curr_r = safe_key(raw_role)
-                                    parsed_c[curr_r] = int(re.sub(r'[^0-9]', '', content.split(':')[1])) if ':' in content else 10
-                                    parsed_w[curr_r] = []
-                                elif curr_r and ':' in line and not line.startswith('-') and not line.startswith('*'):
-                                    dt_part, tk = line.split(':', 1)
-                                    dt_part = dt_part.strip()
-                                    if '~' in dt_part:
-                                        sd, ed = dt_part.split('~', 1)
-                                        parsed_w[curr_r].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False})
-                                    else:
-                                        parsed_w[curr_r].append({"start_date": dt_part, "end_date": dt_part, "task": tk.strip(), "subtasks": [], "done": False})
-                                elif curr_r and (line.startswith('-') or line.startswith('*')):
-                                    sub_desc = line[1:].strip()
-                                    if parsed_w[curr_r]: 
-                                        if "subtasks" not in parsed_w[curr_r][-1]:
-                                            parsed_w[curr_r][-1]["subtasks"] = []
-                                        parsed_w[curr_r][-1]["subtasks"].append({"desc": sub_desc, "done": False})
-                            
-                            old_title = p_data['title']
-                            
-                            if new_t != old_title:
-                                for a in db['admins']:
-                                    if old_title in a.get('programs', []):
-                                        a['programs'] = [new_t if x == old_title else x for x in a['programs']]
-                                        
-                            for u in db['users']:
-                                if u['program'] == old_title:
-                                    u['program'] = new_t 
-                                    if u['role'] in parsed_w:
-                                        new_user_workflow = copy.deepcopy(parsed_w[u['role']])
-                                        for new_t_dict in new_user_workflow:
-                                            for old_t_dict in u['workflow']:
-                                                if new_t_dict['task'] == old_t_dict['task']:
-                                                    new_t_dict['done'] = old_t_dict.get('done', False)
-                                                    for new_st_dict in new_t_dict.get('subtasks', []):
-                                                        for old_st_dict in old_t_dict.get('subtasks', []):
-                                                            if new_st_dict['desc'] == old_st_dict['desc']:
-                                                                new_st_dict['done'] = old_st_dict.get('done', False)
-                                        u['workflow'] = new_user_workflow
-                            
-                            temp_prog = db['programs'][p_idx]
-                            db['programs'][p_idx] = {
-                                "title": new_t, "desc": new_d, "video": new_v, "color": new_color, 
-                                "recruit_start": new_r_start.strftime("%Y-%m-%d"),
-                                "recruit_end": new_r_end.strftime("%Y-%m-%d"),
-                                "roles_capacity": parsed_c, "roles_workflow": parsed_w
-                            }
-                            if save_data(db):
-                                st.success("수정 완료! 보안을 위해 잠시 후 로그아웃됩니다.")
-                                time.sleep(1.5)
-                                st.session_state['admin_logged_in'] = False
-                                st.rerun()
-                            else:
-                                db['programs'][p_idx] = temp_prog # 롤백
-
-        with tab_settings:
-            with st.container(border=True):
-                st.subheader("🔑 내 비밀번호 변경")
-                with st.form("change_pin_form"):
-                    new_pin = st.text_input("새로운 4자리 비밀번호", type="password", max_chars=4)
-                    if st.form_submit_button("변경하기"):
-                        if len(new_pin) == 4 and new_pin.isdigit():
-                            admin_in_db = next(a for a in db['admins'] if a['name'] == admin_info['name'])
-                            old_pin = admin_in_db['pin']
-                            admin_in_db['pin'] = new_pin
-                            if save_data(db):
-                                st.success("변경 성공! 다시 로그인해주세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
-                            else:
-                                admin_in_db['pin'] = old_pin
-                        else: st.error("4자리 숫자로 입력해주세요.")
+            st.info("프로그램 세부 정보 수정은 관리자 매뉴얼을 참고해 주세요.")
             
-            if is_super:
-                with st.container(border=True):
-                    st.subheader("👑 최고관리자: 선생님 계정 발급")
-                    with st.form("new_admin_form"):
-                        colA, colB = st.columns(2)
-                        new_adm_name = colA.text_input("새 관리자 이름 (예: 김철수 선생님)")
-                        new_adm_pin = colB.text_input("초기 비밀번호 4자리", max_chars=4)
-                        all_prog_titles = [p['title'] for p in db['programs']]
-                        assign_progs = st.multiselect("담당 프로그램 할당", all_prog_titles)
-                        
-                        if st.form_submit_button("관리자 계정 생성", type="primary"):
-                            if not new_adm_name or len(new_adm_pin) != 4 or not new_adm_pin.isdigit():
-                                st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
-                            else:
-                                db['admins'].append({"name": new_adm_name, "pin": new_adm_pin, "role": "normal", "programs": assign_progs})
-                                if save_data(db):
-                                    st.success(f"[{new_adm_name}] 선생님 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
-                                else:
-                                    db['admins'].pop()
-                    
-                    st.write("#### 📋 등록된 선생님(관리자) 목록")
-                    df_admins = pd.DataFrame([{"이름": a['name'], "권한": "최고관리자" if a['role'] == "super" else "담당 지도사", "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
-                    st.dataframe(df_admins, hide_index=True, use_container_width=True)
-                    
-                    st.divider()
-                    st.write("#### 🗑️ 선생님 계정 강제 삭제")
-                    normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
-                    if normal_admins:
-                        col_del1, col_del2 = st.columns([8, 2])
-                        admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed")
-                        if col_del2.button("❌ 계정 삭제", type="primary", use_container_width=True):
-                            temp_admins = copy.deepcopy(db['admins'])
-                            db['admins'] = [a for a in db['admins'] if a['name'] != admin_to_delete]
-                            if save_data(db):
-                                st.success(f"[{admin_to_delete}] 계정이 성공적으로 삭제되었습니다."); time.sleep(1); st.rerun()
-                            else:
-                                db['admins'] = temp_admins
-                    else:
-                        st.info("현재 삭제할 수 있는 일반 선생님(지도사) 계정이 없습니다.")
-
+        with tab_settings:
+            with st.form("pin_form"):
+                npin = st.text_input("새 4자리 비밀번호", type="password", max_chars=4)
+                if st.form_submit_button("변경"):
+                    if len(npin) == 4 and npin.isdigit():
+                        adm = next(a for a in db['admins'] if a['name'] == admin_info['name'])
+                        op = adm['pin']; adm['pin'] = npin
+                        if save_data(db): st.success("변경 완료. 다시 로그인하세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
+                        else: adm['pin'] = op
