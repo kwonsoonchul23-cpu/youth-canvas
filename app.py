@@ -66,7 +66,7 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* 사이드바 UI 커스텀 (메뉴 4개 컬러 배분) */
+    /* 사이드바 UI 커스텀 */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
@@ -79,6 +79,12 @@ st.markdown("""
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } 
     [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } 
     [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
+    
+    /* 리포트 카드 디자인 */
+    .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
+    .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
+    .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
+    .info-text { color: #475569; font-weight: 500;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -234,7 +240,7 @@ if st.session_state.menu_option == "찾아보기 (탐색)":
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page("나의 이야기")
 
 # =========================================================
-# [페이지 2-1] 청소년 전용 페이지
+# [페이지 2-1] 청소년 전용 페이지 
 # =========================================================
 elif st.session_state.menu_option == "나의 이야기":
     st.markdown("## 🙋 나의 활동 진행도")
@@ -478,7 +484,7 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             
             if not users_to_show: 
-                st.info("데이터가 부족하여 대시보드를 생성할 수 없습니다.")
+                st.info(f"데이터가 부족하여 대시보드를 생성할 수 없습니다. {T_USER}이 등록되고 평가가 진행되어야 합니다.")
             else:
                 dashboard_data = []
                 task_data = []
@@ -499,36 +505,11 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                st.markdown("#### 💡 AI 데이터 분석 해석 리포트")
-                if not df_dash.empty:
-                    top_prog = df_dash.groupby('Program')['AvgScore'].mean().idxmax()
-                    top_score = df_dash.groupby('Program')['AvgScore'].mean().max()
-                    
-                    pos_text = f"**[긍정적 시그널 🟢]**\n"
-                    pos_text += f"- **우수 프로그램:** '{top_prog}' 프로그램이 평균 성취도 {top_score:.1f}점으로 가장 훌륭한 성과를 내고 있습니다.\n"
-                    
-                    corr = df_dash['Comments'].corr(df_dash['AvgScore'])
-                    if pd.notna(corr) and corr > 0.3:
-                        pos_text += f"- **피드백 효과:** {T_ADMIN}의 코멘트 수와 성취도 간에 긍정적인 상관관계(계수: {corr:.2f})가 확인되었습니다.\n"
-                    st.success(pos_text)
-                    
-                    neg_text = f"**[주의 및 개선 필요 🔴]**\n"
-                    low_students = df_dash[df_dash['AvgScore'] < 60]
-                    if not low_students.empty:
-                        names = ", ".join(low_students['Student'].tolist())
-                        neg_text += f"- **성취도 부진 {T_USER}:** {names} {T_USER}의 평균 성취도가 60점 미만입니다. 빠른 개별 면담이 필요합니다.\n"
-                    else:
-                        neg_text += f"- **이탈 위험 점검:** 현재 성취도가 심각하게 낮은 이탈 위험 {T_USER}은 없습니다. 훌륭하게 관리되고 있습니다.\n"
-                        
-                    if not df_tasks.empty:
-                        hard_task = df_tasks.groupby('Task')['Score'].mean().idxmin()
-                        hard_score = df_tasks.groupby('Task')['Score'].mean().min()
-                        if hard_score < 70:
-                            neg_text += f"- **커리큘럼 난이도 점검:** '{hard_task}' 주차/과업의 평균 점수가 {hard_score:.1f}점으로 전체 중 가장 낮습니다. 난이도를 조율해 보세요.\n"
-                    st.error(neg_text)
-                    st.divider()
-
-                st.markdown("##### 🔍 프로그램별 성과 및 이상치 탐지")
+                # ==============================================================
+                # ✨ [신규 기능] 4개 차트 각각에 대한 지능형 텍스트 해석 리포트
+                # ==============================================================
+                
+                # 1. 상단 두 차트 (Bar, Box) 생성
                 fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                 ax1.set_title('Average Score by Program')
@@ -540,9 +521,36 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax2.set_ylim(0, 100)
                 ax2.tick_params(axis='x', rotation=45)
                 st.pyplot(fig1)
-                st.info(f"💡 **{insight_caller} 인사이트:** 오른쪽 박스플롯(Boxplot) 아래쪽에 찍힌 점들은 평균 성취도에 한참 못 미치는 **'이탈 위험 {T_USER}(이상치)'**입니다. 개별 면담이 필요합니다.")
 
-                st.markdown(f"##### 🔍 {T_ADMIN} 관리 효율성 및 과업 난이도 분석")
+                # 1-1. 차트 1 (Bar) 해석: 프로그램별 평균 성취도
+                st.markdown(f"**💡 [차트 1] 프로그램별 평균 성취도 해석**")
+                valid_scores = df_dash[df_dash['AvgScore'] > 0]
+                if valid_scores.empty or df_dash['AvgScore'].max() == 0:
+                    st.info(f"📉 **데이터 부족:** 아직 {T_ADMIN}의 평가가 입력되지 않았습니다. 평가가 누적되면 프로그램 간 성과 비교가 제공됩니다.")
+                else:
+                    top_p = valid_scores.groupby('Program')['AvgScore'].mean().idxmax()
+                    top_s = valid_scores.groupby('Program')['AvgScore'].mean().max()
+                    low_p = valid_scores.groupby('Program')['AvgScore'].mean().idxmin()
+                    low_s = valid_scores.groupby('Program')['AvgScore'].mean().min()
+                    
+                    st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_p}' 프로그램이 평균 {top_s:.1f}점으로 가장 우수한 성과를 보이고 있습니다.</div>" +
+                                (f"<div class='neg-text'>🔴 주의 요망: '{low_p}' 프로그램이 평균 {low_s:.1f}점으로 상대적으로 부진합니다. 점검이 필요합니다.</div></div>" if low_s < 60 else f"<div class='info-text'>ℹ️ 특이사항: 평균 60점 미만으로 심각하게 부진한 프로그램은 없습니다.</div></div>"), unsafe_allow_html=True)
+                
+                # 1-2. 차트 2 (Box) 해석: 이탈 위험 (이상치) 탐지
+                st.markdown(f"**💡 [차트 2] {T_USER} 성취도 분포 및 이탈 위험 탐지**")
+                if len(valid_scores) < 3 or df_dash['AvgScore'].max() == 0:
+                    st.info(f"📉 **데이터 부족:** {T_USER} 표본이 부족하여 신뢰할 수 있는 이상치(Outlier)를 판별하기 어렵습니다.")
+                else:
+                    risk_users = valid_scores[valid_scores['AvgScore'] < 60]
+                    if risk_users.empty:
+                        st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 성취도가 60점 미만으로 심각하게 이탈한 {T_USER}이 발견되지 않았습니다. 전반적으로 훌륭하게 관리되고 있습니다.</div></div>", unsafe_allow_html=True)
+                    else:
+                        names = ", ".join(risk_users['Student'].tolist())
+                        st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 즉각 조치 요망: {names} {T_USER}의 성취도가 60점 미만으로 하위권에 머물러 있습니다 (우측 박스플롯 하단 점 확인). 이탈 방지를 위한 개별 상담이 필요합니다.</div></div>", unsafe_allow_html=True)
+
+                st.divider()
+
+                # 2. 하단 두 차트 (Scatter, Hist) 생성
                 fig2, (ax3, ax4) = plt.subplots(1, 2, figsize=(15, 5))
                 sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax3, palette='Set1', alpha=0.8)
                 ax3.set_title('Teacher Comments vs Student Score')
@@ -553,6 +561,36 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 ax4.set_title('Distribution of All Task Scores (Difficulty)')
                 ax4.set_xlabel('Score')
                 st.pyplot(fig2)
+
+                # 2-1. 차트 3 (Scatter) 해석: 코멘트-성취도 상관관계
+                st.markdown(f"**💡 [차트 3] {T_ADMIN} 관리 효율성 (피드백 효과) 분석**")
+                if df_dash['Comments'].sum() == 0 or len(valid_scores) < 3:
+                    st.info(f"📉 **데이터 부족:** 작성된 코멘트(피드백)가 충분하지 않아 상관관계를 분석할 수 없습니다. {T_ADMIN}님들이 평가 시 코멘트를 적극적으로 남겨주시면 관리 효율성 파악이 가능합니다.")
+                else:
+                    corr = df_dash['Comments'].corr(df_dash['AvgScore'])
+                    if pd.isna(corr):
+                        st.info("📉 **데이터 부족:** 변동성이 부족하여 상관계수를 도출할 수 없습니다.")
+                    elif corr >= 0.3:
+                        st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 코멘트 수와 성취도 간에 양의 상관관계(계수: {corr:.2f})가 존재합니다. {T_ADMIN}의 피드백이 {T_USER} 성취도 향상에 직접적인 도움을 주고 있습니다.</div></div>", unsafe_allow_html=True)
+                    elif corr <= -0.3:
+                        st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트 수와 성취도 간에 음의 상관관계(계수: {corr:.2f})가 관찰됩니다. 피드백이 잦은 {T_USER}일수록 성취도가 낮은 경향이 있으니, 피드백의 방식이나 내용 점검이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 코멘트 양과 성취도 간에 뚜렷한 상관성(계수: {corr:.2f})은 나타나지 않고 고르게 분포되어 있습니다. 특정 {T_USER}에게 피드백이 편중되지 않았습니다.</div></div>", unsafe_allow_html=True)
+
+                # 2-2. 차트 4 (Hist) 해석: 전체 과업 난이도
+                st.markdown(f"**💡 [차트 4] 전체 커리큘럼(과업) 난이도 분포 분석**")
+                valid_tasks = df_tasks[df_tasks['Score'] > 0]
+                if valid_tasks.empty:
+                    st.info(f"📉 **데이터 부족:** 세부 과업별 평가 점수가 입력되지 않아 분포를 그릴 수 없습니다.")
+                else:
+                    avg_task_score = valid_tasks['Score'].mean()
+                    hard_tasks = valid_tasks.groupby('Task')['Score'].mean()
+                    hardest_task = hard_tasks.idxmin()
+                    hardest_score = hard_tasks.min()
+                    
+                    pos_msg = f"<div class='pos-text'>🟢 긍정적 시그널: 전체 과업의 평균 달성도가 {avg_task_score:.1f}점으로 전반적으로 무난하고 적절한 난이도 수준을 유지하고 있습니다.</div>" if avg_task_score >= 70 else ""
+                    neg_msg = f"<div class='neg-text'>🔴 주의 요망: '{hardest_task}' 과업의 평균 점수가 {hardest_score:.1f}점으로 가장 낮습니다(왼쪽 쏠림 현상). 다음 회차 진행 시 해당 커리큘럼의 난이도 조절이나 추가 지원을 고려하세요.</div>" if hardest_score < 60 else f"<div class='info-text'>ℹ️ 특이사항: 현재 평균 60점 미만의 지나치게 어려운(난이도 조절 실패) 과업은 관찰되지 않았습니다.</div>"
+                    st.markdown(f"<div class='report-box'>{pos_msg}{neg_msg}</div>", unsafe_allow_html=True)
 
         with tab_eval:
             st.subheader(f"📝 {T_USER} 주차/과업별 달성도 및 코멘트 평가")
@@ -849,7 +887,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                                 tu.setdefault(msg_key, []).append({"sender": "admin", "content": ri})
                                 if save_data(db): st.rerun()
                     
-                    # ✨ [신규] 학생 정보 (이름/비번) 수정 에디터
                     st.divider()
                     st.write(f"#### ✏️ {T_USER} 정보 수정")
                     with st.form(f"edit_user_form_{t_idx}"):
@@ -860,7 +897,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                         if st.form_submit_button(f"{T_USER} 정보 수정 저장", type="primary"):
                             if edit_u_name and len(edit_u_pin) == 4 and edit_u_pin.isdigit():
                                 old_u_name = tu['name']
-                                # 이름 변경 시 학부모 연결 데이터 무결성 보호 업데이트
                                 if old_u_name != edit_u_name:
                                     for p in db['parents']:
                                         for s in p.get('linked_students', []):
@@ -925,7 +961,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             else:
                                 st.write("연결된 데이터가 없습니다.")
                     
-                    # ✨ [신규] 학부모 정보 (이름/비번/연결자녀) 수정 에디터
                     st.divider()
                     st.write(f"#### ✏️ 기존 {T_PARENT} 정보 수정")
                     p_to_edit_name = st.selectbox(f"수정할 {T_PARENT} 선택", [p['name'] for p in db['parents']])
@@ -1054,7 +1089,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             
                             old_title = p_data['title']
                             
-                            # ✨ [핵심 무결성 보완] 프로그램 이름 변경 시 학부모 연결 데이터 자동 갱신
                             if new_t != old_title:
                                 for a in db['admins']:
                                     if old_title in a.get('programs', []):
@@ -1155,7 +1189,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                     df_admins = pd.DataFrame([{"이름": a['name'], "권한": T_SUPER if a['role'] == "super" else T_ADMIN, "담당 프로그램": ", ".join(a.get('programs', [])) if a.get('programs') else "없음/전체"} for a in db['admins']])
                     st.dataframe(df_admins, hide_index=True, use_container_width=True)
                     
-                    # ✨ [신규] 관리자 정보 (이름/비번/프로그램) 수정 에디터
                     st.divider()
                     st.write(f"#### ✏️ 기존 {T_ADMIN} 정보 수정")
                     normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
