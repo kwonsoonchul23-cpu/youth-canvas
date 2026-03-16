@@ -17,13 +17,12 @@ import matplotlib.font_manager as fm
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
 
-# --- ✨ [핵심 수정] 시각화 폰트 설정 (Streamlit 클라우드 한글 깨짐 100% 방어) ---
+# --- ✨ 시각화 폰트 설정 (Streamlit 클라우드 한글 깨짐 100% 방어) ---
 @st.cache_resource
 def set_korean_font():
     font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
     font_path = "NanumGothic.ttf"
     try:
-        # 클라우드에 폰트가 없으면 구글에서 즉시 다운로드
         if not os.path.exists(font_path):
             urllib.request.urlretrieve(font_url, font_path)
         fm.fontManager.addfont(font_path)
@@ -33,7 +32,6 @@ def set_korean_font():
         plt.rcParams['axes.unicode_minus'] = False
         sns.set_theme(style='whitegrid', font=font_name, font_scale=1.0)
     except:
-        # 혹시 모를 로컬 에러 대비용
         import platform
         if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
         elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
@@ -468,7 +466,6 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                 st.download_button("📥 결과 엑셀(CSV) 다운로드", data=csv_data, file_name="명단.csv", mime="text/csv", type="primary")
             else: st.info("데이터가 없습니다.")
 
-        # ✨ [기능 추가 완료] 출석 탭에 3번째 '개별 기록 수정/삭제' 탭 생성
         with tab_attendance:
             st.subheader("✅ 프로그램별 출석 관리")
             if my_programs:
@@ -568,11 +565,53 @@ elif st.session_state.menu_option == "관계자 외 출입금지":
                             plt.xticks(rotation=45, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
                             st.pyplot(fig_att)
-                            st.info("💡 **원장님 인사이트:** 빨간색(결석)이나 노란색(지각) 누적 비율이 높은 학생을 한눈에 식별하고 빠르게 학부모 면담을 진행할 수 있습니다.")
+                            
+                            # ✨ [신규 추가] 이탈 위험 학생 자동 탐지 리포트
+                            st.divider()
+                            st.markdown("#### 🚨 이탈 위험 학생 자동 리포트 (경고 시스템)")
+                            threshold = st.slider("⚠️ 위험 기준 설정 (결석+지각 누적 비율 %)", min_value=10, max_value=100, value=30, step=5)
+                            
+                            risk_reports = []
+                            for student_name, row in agg_df.iterrows():
+                                total_days = row.sum()
+                                if total_days > 0:
+                                    bad_days = row['결석'] + row['지각']
+                                    bad_ratio = (bad_days / total_days) * 100
+                                    
+                                    if bad_ratio >= threshold:
+                                        student_records = df_att[df_att['학생명'] == student_name]
+                                        recent_notes = student_records[student_records['비고'] != '']['비고'].tail(3).tolist()
+                                        note_str = ", ".join(recent_notes) if recent_notes else "특이사항 없음"
+                                        
+                                        risk_reports.append({
+                                            "학생명": student_name,
+                                            "위험 지수": f"{bad_ratio:.1f}%",
+                                            "총 기록일": total_days,
+                                            "결석": row['결석'],
+                                            "지각": row['지각'],
+                                            "최근 비고": note_str
+                                        })
+                            
+                            if risk_reports:
+                                st.error(f"**주의 요망!** 설정하신 기준({threshold}%)을 초과하여 집중 관리가 필요한 학생이 {len(risk_reports)}명 있습니다.")
+                                df_risk = pd.DataFrame(risk_reports)
+                                st.dataframe(df_risk, use_container_width=True, hide_index=True)
+                                
+                                report_text = f"단기 이탈 위험 학생 리포트 (기준: 결석/지각 {threshold}% 이상)\n"
+                                report_text += "=" * 40 + "\n"
+                                for r in risk_reports:
+                                    report_text += f"👤 {r['학생명']}\n"
+                                    report_text += f" - 위험 지수: {r['위험 지수']} (총 {r['총 기록일']}일 중 결석 {r['결석']}일, 지각 {r['지각']}일)\n"
+                                    report_text += f" - 최근 비고: {r['최근 비고']}\n\n"
+                                
+                                with st.expander("📄 텍스트 리포트 복사하기 (학부모 상담/원장 보고용)"):
+                                    st.text_area("아래 내용을 복사하여 카카오톡이나 보고서에 바로 활용하세요.", value=report_text, height=200)
+                            else:
+                                st.success(f"현재 결석/지각 비율이 {threshold}% 이상인 이탈 위험 학생이 없습니다. 아주 잘 관리되고 있습니다!")
+                                
                         else:
                             st.info("아직 기록된 출석 데이터가 없습니다. [일일 출석 입력] 탭에서 먼저 출석을 기록해 주세요.")
                             
-                    # ✨ 새롭게 추가된 3번째 서브탭: 개별 기록 수정/삭제 기능
                     with att_sub3:
                         st.markdown("#### ✏️ 개별 학생 출석 기록 수정 및 삭제")
                         st.info("특정 학생의 잘못 입력된 과거 출석 기록을 개별적으로 수정하거나 아예 지울 수 있습니다.")
