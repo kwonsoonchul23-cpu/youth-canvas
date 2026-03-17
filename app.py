@@ -36,7 +36,6 @@ def set_korean_font():
         if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
         elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
     
-    # ✨ 에러를 유발하는 svg 옵션 대신, PNG 자체의 해상도를 300 DPI로 초고화질 렌더링!
     plt.rcParams['axes.unicode_minus'] = False
     plt.rcParams['figure.dpi'] = 300  
     sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
@@ -63,32 +62,29 @@ st.markdown("""
     .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; vertical-align: top; }
     .schedule-table td.task-content { text-align: left; }
     
-    /* 리포트 카드 디자인 */
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
     .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
     .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
     .info-text { color: #475569; font-weight: 500;}
     
-    /* 가족 CRM 카드 디자인 */
     .crm-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; border-left: 6px solid #2b7a78; }
     .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
     .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
     .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
     .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
     
-    /* 사이드바 UI 커스텀 */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
-    [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] { width: 100%; height: 75px; margin: 0; padding: 0 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) { width: 100%; padding-left: 15px; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label { 
+        width: 100%; min-height: 65px; margin: 0 0 12px 0; padding: 10px 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #c13945 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background-color: #2b7a78 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #e68128 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.3rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -394,7 +390,6 @@ elif st.session_state.menu_option == UI['menu2']:
                             ax_s1.set_ylim(0, 100); ax_s1.tick_params(axis='x', rotation=15)
                             sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
                             ax_s2.set_ylim(0, 100); ax_s2.tick_params(axis='x', rotation=15)
-                            # ✨ 픽스: format="svg" 삭제!
                             st.pyplot(fig_s1, use_container_width=True)
                             plt.close(fig_s1)
                             
@@ -812,6 +807,7 @@ elif st.session_state.menu_option == UI['menu4']:
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
+                # ✨ [차트 추가] 1. 막대 그래프
                 if "막대 그래프 (프로그램별 평균 성취도) [추천]" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
@@ -832,6 +828,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_p}' 프로그램이 평균 {top_s:.1f}점으로 가장 우수합니다.</div>" +
                                         (f"<div class='neg-text'>🔴 주의 요망: '{low_p}' 프로그램이 평균 {low_s:.1f}점으로 부진합니다. 원인 파악이 필요합니다.</div></div>" if low_s < 60 else f"<div class='info-text'>ℹ️ 특이사항: 평균 60점 미만인 프로그램은 없습니다.</div></div>"), unsafe_allow_html=True)
 
+                # ✨ [차트 추가] 2. 도넛 차트
                 if "도넛 차트 (전체 출결 종합 비율)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 🍩 도넛 차트: 시설 전체 {T_USER} 출결 비율")
@@ -855,6 +852,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             else:
                                 st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 전체 결석 및 지각 비율이 {bad_ratio:.1f}%에 달합니다. 출결 관리 캠페인이 필요합니다.</div></div>", unsafe_allow_html=True)
 
+                # ✨ [차트 추가] 3. 라인 그래프
                 if "라인 그래프 (시간 흐름별 성취도 추이)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 📈 라인 그래프: 시간에 따른 프로그램 성과 변화")
@@ -869,6 +867,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             plt.close(fig_l)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 선이 우상향하면 성취도가 개선되는 추세이며, 우하향할 경우 학습 난이도 조절이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
+                # ✨ [차트 추가] 4. 히트맵
                 if "히트맵 (일자별 출석 밀도 분석)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 🔲 히트맵: {T_USER}별 출결 패턴 밀도")
@@ -887,6 +886,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             plt.close(fig_h)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 붉은색이 연속해서 나타나는 행(특정 학생)이나 열(특정 요일)을 찾아 개별 면담이나 스케줄 보완을 진행하세요.</div></div>", unsafe_allow_html=True)
 
+                # ✨ [차트 추가] 5. 산점도
                 if "산점도 (선생님 피드백 효과 분석) [추천]" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 🎯 산점도: {T_ADMIN} 피드백 빈도와 {T_USER} 성과 상관관계")
@@ -911,6 +911,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             else:
                                 st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 피드백 횟수와 성적 간에 뚜렷한 패턴이 관찰되지 않았습니다.</div></div>", unsafe_allow_html=True)
 
+                # ✨ [차트 추가] 6. 스택 막대 그래프
                 if "스택 막대 그래프 (출결 상세 비율)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 스택 막대 그래프: 프로그램별 출결 누적 구성")
@@ -1635,6 +1636,18 @@ elif st.session_state.menu_option == UI['menu4']:
                     else: st.error("4자리 숫자로 입력해주세요.")
             
             if is_super:
+                st.divider()
+                st.subheader("💾 전체 시스템 데이터 백업")
+                st.info("💡 시스템 랜섬웨어 대비 및 오프라인 데이터 보관을 위해 전체 시스템 데이터를 파일(JSON)로 다운로드할 수 있습니다.")
+                json_string = json.dumps(db, ensure_ascii=False, indent=2)
+                st.download_button(
+                    label="📥 전체 데이터 원클릭 백업 (JSON 다운로드)",
+                    file_name=f"YouthCanvas_Full_Backup_{datetime.now().strftime('%Y%m%d')}.json",
+                    mime="application/json",
+                    data=json_string,
+                    type="primary"
+                )
+                
                 with st.container(border=True):
                     st.subheader("🔤 맞춤형 호칭 설정 (명칭 변수 변경)")
                     st.info("💡 기관의 성격에 맞게 시스템상에서 사람을 부르는 호칭을 일괄 변경하세요.")
