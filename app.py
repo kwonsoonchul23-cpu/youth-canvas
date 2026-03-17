@@ -142,7 +142,7 @@ def load_data():
             data = response.json()
             if data and isinstance(data, dict) and 'programs' in data: 
                 if 'parents' not in data: data['parents'] = []
-                if 'payments' not in data: data['payments'] = [] # ✨ 결제 데이터 저장소
+                if 'payments' not in data: data['payments'] = [] 
                 if 'settings' not in data: data['settings'] = {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31"}
                 if 'terms' not in data['settings']: data['settings']['terms'] = {"super": "최고관리자", "admin": "선생님", "staff": "행정", "user": "학생", "parent": "학부모"}
                 if 'ui' not in data['settings']:
@@ -153,7 +153,6 @@ def load_data():
                     }
                 return data
     except Exception as e: st.error(f"🚨 연결 오류: {e}")
-    # 예비 템플릿 반환
     return {"programs": [], "users": [], "parents": [], "payments": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"recruit_start": "2026-01-01", "recruit_end": "2026-12-31", "terms": {"super": "최고관리자", "admin": "선생님", "staff": "행정", "user": "학생", "parent": "학부모"}, "ui": {"brand_title": "Youth Canvas", "brand_subtitle": "청소년의 꿈을 그리는 공간", "menu1": "찾아보기 (탐색)", "menu2": "나의 이야기", "menu3": "👨‍👩‍👧 학부모 공간", "menu4": "관계자 외 출입금지", "page1_title": "✨ 지금 뜨고 있는 활동", "page2_title": "🙋 나의 활동 진행도", "page3_title": "🔒 관리자 전용 포털"}}}
 
 def save_data(data):
@@ -736,6 +735,7 @@ elif st.session_state.menu_option == UI['menu4']:
         admin_info = st.session_state['logged_admin']
         is_super = (admin_info['role'] == 'super')
         is_staff = (admin_info['role'] == 'staff')
+        is_normal = (admin_info['role'] == 'normal') # ✨ FIX: is_normal 변수 추가!
         
         # ✨ 권한별 열람 가능한 프로그램 리스트
         if is_super or is_staff:
@@ -762,7 +762,7 @@ elif st.session_state.menu_option == UI['menu4']:
 
         # ---------------------------------------------------------
         # 공통 탭: 경영 대시보드
-        if is_super or is_staff or not is_super:
+        if is_super or is_staff or is_normal:
             with tab_dashboard:
                 dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
                 insight_caller = T_SUPER if is_super else f"{admin_info['name']} {T_ADMIN}"
@@ -1508,158 +1508,6 @@ elif st.session_state.menu_option == UI['menu4']:
                         if st.button("❌ 선택한 가족 계정 전체 삭제"):
                             db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
                             if save_data(db): st.rerun()
-
-        # ---------------------------------------------------------
-        # 공통 탭: 데이터 필터링 (Overview) 및 계정 세팅
-        if is_super or is_staff or is_normal:
-            with tab_overview:
-                st.write("#### 📊 데이터 필터링 및 엑셀(이미지) 추출")
-                users_to_show = [u for u in db['users'] if u['program'] in my_programs]
-                if users_to_show:
-                    overview_data = []
-                    for u in users_to_show:
-                        t_scores = [t.get('score', 0) for t in u['workflow']]
-                        pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
-                        
-                        att_counts = 0
-                        for d_key, v in u.get('attendance', {}).items():
-                            if is_active_role_period(u, d_key) and v.get('status') == '출석':
-                                att_counts += 1
-                                
-                        overview_data.append({
-                            f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
-                            "평균성취도(점)": pct, "총 출석(일)": att_counts
-                        })
-                    df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
-                    st.dataframe(df_out, use_container_width=True, hide_index=True)
-                    
-                    fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
-                    ax_table.axis('tight')
-                    ax_table.axis('off')
-                    
-                    table = ax_table.table(cellText=df_out.values, colLabels=df_out.columns, loc='center', cellLoc='center')
-                    table.auto_set_font_size(False)
-                    table.set_fontsize(11)
-                    table.scale(1.2, 1.8)
-                    
-                    for (row, col), cell in table.get_celld().items():
-                        if row == 0:
-                            cell.set_facecolor('#4f46e5')
-                            cell.set_text_props(color='white', weight='bold')
-                    
-                    buf = io.BytesIO()
-                    plt.savefig(buf, format="png", bbox_inches='tight', dpi=300)
-                    buf.seek(0)
-                    plt.close(fig_table) 
-                    
-                    st.download_button(
-                        label="📥 결과 이미지(PNG) 다운로드",
-                        data=buf,
-                        file_name=f"YouthCanvas_명단_{datetime.now().strftime('%Y%m%d')}.png",
-                        mime="image/png",
-                        type="primary"
-                    )
-                else: st.info("데이터가 없습니다.")
-
-            with tab_settings:
-                with st.form("pin_form"):
-                    npin = st.text_input("내 계정 새 비밀번호 변경 (4자리)", type="password", max_chars=4)
-                    if st.form_submit_button("변경 적용"):
-                        if len(npin) == 4 and npin.isdigit():
-                            adm = next(a for a in db['admins'] if a['name'] == admin_info['name'])
-                            op = adm['pin']; adm['pin'] = npin
-                            if save_data(db): st.success("변경 완료. 다시 로그인하세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
-                            else: adm['pin'] = op
-                        else: st.error("4자리 숫자로 입력해주세요.")
-                
-                if is_super:
-                    st.divider()
-                    st.subheader("💾 전체 시스템 데이터 백업")
-                    st.info("💡 시스템 랜섬웨어 대비 및 오프라인 데이터 보관을 위해 전체 시스템 데이터를 파일(JSON)로 다운로드할 수 있습니다.")
-                    json_string = json.dumps(db, ensure_ascii=False, indent=2)
-                    st.download_button(
-                        label="📥 전체 데이터 원클릭 백업 (JSON 다운로드)",
-                        file_name=f"YouthCanvas_Full_Backup_{datetime.now().strftime('%Y%m%d')}.json",
-                        mime="application/json",
-                        data=json_string,
-                        type="primary"
-                    )
-                    
-                    with st.container(border=True):
-                        st.subheader("🔤 맞춤형 호칭 설정 (명칭 변수 변경)")
-                        st.info("💡 기관의 성격에 맞게 시스템상에서 사람을 부르는 호칭을 일괄 변경하세요.")
-                        with st.form("terms_form"):
-                            c1, c2, c3 = st.columns(3)
-                            new_t_super = c1.text_input("최고관리자 호칭", value=T_SUPER)
-                            new_t_admin = c2.text_input("일반관리자(선생님) 호칭", value=T_ADMIN)
-                            new_t_staff = c3.text_input("행정직원 호칭", value=T_STAFF)
-                            
-                            c4, c5, _ = st.columns(3)
-                            new_t_user = c4.text_input("이용자(학생) 호칭", value=T_USER)
-                            new_t_parent = c5.text_input("보호자(학부모) 호칭", value=T_PARENT)
-                            
-                            if st.form_submit_button("호칭 변경 적용", type="primary"):
-                                db['settings']['terms'] = {"super": new_t_super, "admin": new_t_admin, "staff": new_t_staff, "user": new_t_user, "parent": new_t_parent}
-                                if save_data(db):
-                                    st.success("시스템 호칭이 성공적으로 변경되었습니다!")
-                                    time.sleep(1)
-                                    st.rerun()
-                    
-                    with st.container(border=True):
-                        st.subheader(f"👑 {T_SUPER}: 관리자/행정 계정 발급")
-                        with st.form("new_admin_form"):
-                            st.write(f"**➕ 신규 직원 계정 생성**")
-                            colA, colB = st.columns(2)
-                            new_adm_name = colA.text_input(f"이름 (예: 김철수 선생님)")
-                            new_adm_pin = colB.text_input("초기 비밀번호 4자리", max_chars=4)
-                            
-                            # ✨ 신규: 역할 선택 분기
-                            role_type = st.radio("계정 유형 선택", [f"{T_ADMIN} (수업/평가)", f"{T_STAFF} (결제/재무)"], horizontal=True)
-                            
-                            staff_perm = "entry"
-                            assign_progs = []
-                            
-                            if T_STAFF in role_type:
-                                staff_perm_label = st.selectbox("행정 권한 수준 부여", ["단순 입력 및 수정 (통계/시각화 열람 불가)", "재무/통계 전체 열람 (세무 수준 열람 가능)"])
-                                staff_perm = "entry" if "단순" in staff_perm_label else "full"
-                            else:
-                                all_prog_titles = [p['title'] for p in db['programs']]
-                                assign_progs = st.multiselect("담당 프로그램 할당", all_prog_titles)
-                            
-                            if st.form_submit_button(f"직원 계정 생성", type="primary"):
-                                if not new_adm_name or len(new_adm_pin) != 4 or not new_adm_pin.isdigit():
-                                    st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
-                                else:
-                                    r_val = "staff" if T_STAFF in role_type else "normal"
-                                    db['admins'].append({"name": new_adm_name, "pin": new_adm_pin, "role": r_val, "programs": assign_progs, "staff_permission": staff_perm})
-                                    if save_data(db):
-                                        st.success(f"[{new_adm_name}] 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
-                                    else:
-                                        db['admins'].pop()
-                        
-                        st.write(f"#### 📋 등록된 직원 목록")
-                        df_admins = pd.DataFrame([{
-                            "이름": a['name'], 
-                            "권한 유형": T_SUPER if a['role'] == "super" else (T_STAFF if a['role'] == 'staff' else T_ADMIN), 
-                            "세부 권한": "전체 열람" if a.get('staff_permission')=='full' else ("단순 입력" if a.get('staff_permission')=='entry' else ", ".join(a.get('programs', [])))
-                        } for a in db['admins']])
-                        st.dataframe(df_admins, hide_index=True, use_container_width=True)
-                        
-                        st.divider()
-                        st.write(f"#### 🗑️ 직원 계정 강제 삭제")
-                        normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
-                        if normal_admins:
-                            col_del1, col_del2 = st.columns([8, 2])
-                            admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed", key="del_admin_select")
-                            if col_del2.button("❌ 선택 계정 삭제", type="primary", use_container_width=True):
-                                temp_admins = copy.deepcopy(db['admins'])
-                                db['admins'] = [a for a in db['admins'] if a['name'] != admin_to_delete]
-                                if save_data(db):
-                                    st.success(f"[{admin_to_delete}] 계정이 성공적으로 삭제되었습니다."); time.sleep(1); st.rerun()
-                                else:
-                                    db['admins'] = temp_admins
-                        else:
-                            st.info("현재 삭제할 수 있는 일반/행정 계정이 없습니다.")
 
         # ---------------------------------------------------------
         # 오직 Super 관리자만 접근 가능한 탭
