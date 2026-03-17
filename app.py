@@ -19,7 +19,7 @@ import matplotlib.font_manager as fm
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
 
-# --- ✨ 시각화 폰트 설정 및 초고해상도(DPI) 세팅 ---
+# --- ✨ 시각화 폰트 설정 (Streamlit 클라우드 한글 깨짐 100% 방어) ---
 @st.cache_resource
 def set_korean_font():
     font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
@@ -36,7 +36,6 @@ def set_korean_font():
         if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
         elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
     
-    # ✨ 한글 깨짐 방지 및 초고화질(300 DPI) 렌더링 설정 (확대 시 깨짐 방지)
     plt.rcParams['axes.unicode_minus'] = False
     plt.rcParams['figure.dpi'] = 300  
     sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
@@ -60,35 +59,32 @@ st.markdown("""
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-bottom: 10px; }
     .schedule-table th { border: 1px solid #cbd5e1; padding: 8px; background-color: #f1f5f9; font-weight: bold; color: #334155; }
-    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; }
+    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; vertical-align: top; }
     .schedule-table td.task-content { text-align: left; }
     
-    /* 리포트 카드 디자인 */
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
     .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
     .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
     .info-text { color: #475569; font-weight: 500;}
     
-    /* 가족 CRM 카드 디자인 */
     .crm-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; border-left: 6px solid #2b7a78; }
     .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
     .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
     .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
     .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
     
-    /* 사이드바 UI 커스텀 */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
-    [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] { width: 100%; height: 75px; margin: 0; padding: 0 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) { width: 100%; padding-left: 15px; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } 
-    [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label { 
+        width: 100%; min-height: 65px; margin: 0 0 12px 0; padding: 10px 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #c13945 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background-color: #2b7a78 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #e68128 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.3rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -177,6 +173,7 @@ T_SUPER = db['settings']['terms']['super']
 T_ADMIN = db['settings']['terms']['admin']
 T_USER = db['settings']['terms']['user']
 T_PARENT = db['settings']['terms']['parent']
+
 UI = db['settings']['ui']
 
 menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4']]
@@ -393,7 +390,7 @@ elif st.session_state.menu_option == UI['menu2']:
                             ax_s1.set_ylim(0, 100); ax_s1.tick_params(axis='x', rotation=15)
                             sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
                             ax_s2.set_ylim(0, 100); ax_s2.tick_params(axis='x', rotation=15)
-                            st.pyplot(fig_s1, use_container_width=True)
+                            st.pyplot(fig_s1, format="svg", use_container_width=True)
                             plt.close(fig_s1)
                             
                             if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0:
@@ -416,7 +413,7 @@ elif st.session_state.menu_option == UI['menu2']:
                                 fig_d, ax_d = plt.subplots(figsize=(6, 4))
                                 ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                                 ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                                st.pyplot(fig_d, use_container_width=True)
+                                st.pyplot(fig_d, format="svg", use_container_width=True)
                                 plt.close(fig_d)
                                 
                                 bad_att = att_counts['지각'] + att_counts['결석']
@@ -435,7 +432,7 @@ elif st.session_state.menu_option == UI['menu2']:
                                 fig_l, ax_l = plt.subplots(figsize=(8, 4))
                                 sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                                 ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_l, use_container_width=True)
+                                st.pyplot(fig_l, format="svg", use_container_width=True)
                                 plt.close(fig_l)
                                 
                                 first_score = df_trend['점수'].iloc[0]
@@ -581,7 +578,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_p1, ax_p1 = plt.subplots(figsize=(6, 4))
                                         sns.barplot(data=df_p_summ, x='라벨', y='진행률(%)', ax=ax_p1, palette='mako')
                                         ax_p1.set_ylim(0, 100); ax_p1.tick_params(axis='x', rotation=15)
-                                        st.pyplot(fig_p1, use_container_width=True)
+                                        st.pyplot(fig_p1, format="svg", use_container_width=True)
                                         plt.close(fig_p1)
                                         
                                         if df_p_summ['진행률(%)'].max() == 0:
@@ -596,7 +593,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_p2, ax_p2 = plt.subplots(figsize=(6, 4))
                                         sns.barplot(data=df_p_summ, x='라벨', y='평균 성취도', ax=ax_p2, palette='flare')
                                         ax_p2.set_ylim(0, 100); ax_p2.tick_params(axis='x', rotation=15)
-                                        st.pyplot(fig_p2, use_container_width=True)
+                                        st.pyplot(fig_p2, format="svg", use_container_width=True)
                                         plt.close(fig_p2)
                                         
                                         if df_p_summ['평균 성취도'].max() == 0:
@@ -622,7 +619,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_dp, ax_dp = plt.subplots(figsize=(6, 4))
                                         ax_dp.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                                         ax_dp.text(0, 0, f"총 {total_att_p}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                                        st.pyplot(fig_dp, use_container_width=True)
+                                        st.pyplot(fig_dp, format="svg", use_container_width=True)
                                         plt.close(fig_dp)
                                         
                                         bad_att_p = att_counts_total['지각'] + att_counts_total['결석']
@@ -641,7 +638,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_lp, ax_lp = plt.subplots(figsize=(8, 4))
                                         sns.lineplot(data=df_trend_p, x='날짜', y='점수', hue='자녀명', marker='o', ax=ax_lp)
                                         ax_lp.set_ylim(0, 105); ax_lp.tick_params(axis='x', rotation=45)
-                                        st.pyplot(fig_lp, use_container_width=True)
+                                        st.pyplot(fig_lp, format="svg", use_container_width=True)
                                         plt.close(fig_lp)
                                         st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 자녀들의 시간 흐름에 따른 성취도 변화를 직관적으로 비교할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -816,7 +813,7 @@ elif st.session_state.menu_option == UI['menu4']:
                         fig1, ax1 = plt.subplots(figsize=(8, 4))
                         sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                         ax1.set_ylim(0, 100); ax1.tick_params(axis='x', rotation=15)
-                        st.pyplot(fig1, use_container_width=True)
+                        st.pyplot(fig1, format="svg", use_container_width=True)
                         plt.close(fig1)
 
                         valid_scores = df_dash[df_dash['AvgScore'] > 0]
@@ -844,7 +841,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_d, ax_d = plt.subplots(figsize=(6, 4))
                             ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                             ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                            st.pyplot(fig_d, use_container_width=True)
+                            st.pyplot(fig_d, format="svg", use_container_width=True)
                             plt.close(fig_d)
                             
                             bad_ratio = ((att_counts_total['지각'] + att_counts_total['결석']) / total_att) * 100
@@ -863,7 +860,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_l, ax_l = plt.subplots(figsize=(10, 4))
                             sns.lineplot(data=df_t, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                             ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                            st.pyplot(fig_l, use_container_width=True)
+                            st.pyplot(fig_l, format="svg", use_container_width=True)
                             plt.close(fig_l)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 선이 우상향하면 성취도가 개선되는 추세이며, 우하향할 경우 학습 난이도 조절이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -881,7 +878,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_h, ax_h = plt.subplots(figsize=(10, max(3, len(pivot_h)*0.5)))
                             sns.heatmap(pivot_h, cmap='RdYlGn', cbar=False, linewidths=.5, ax=ax_h)
                             ax_h.set_title("초록색: 출석, 노란색: 지각, 빨간색: 결석", fontsize=10, color='gray')
-                            st.pyplot(fig_h, use_container_width=True)
+                            st.pyplot(fig_h, format="svg", use_container_width=True)
                             plt.close(fig_h)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 붉은색이 연속해서 나타나는 행(특정 학생)이나 열(특정 요일)을 찾아 개별 면담이나 스케줄 보완을 진행하세요.</div></div>", unsafe_allow_html=True)
 
@@ -892,7 +889,7 @@ elif st.session_state.menu_option == UI['menu4']:
                         sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax_s, palette='Set1', alpha=0.8)
                         ax_s.set_xlabel('Number of Comments Given')
                         ax_s.set_ylabel('Average Score')
-                        st.pyplot(fig_s, use_container_width=True)
+                        st.pyplot(fig_s, format="svg", use_container_width=True)
                         plt.close(fig_s)
 
                         valid_sc = df_dash[df_dash['AvgScore'] > 0]
@@ -930,7 +927,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             ax_st.set_ylabel('Days Count')
                             plt.xticks(rotation=15, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
-                            st.pyplot(fig_st, use_container_width=True)
+                            st.pyplot(fig_st, format="svg", use_container_width=True)
                             plt.close(fig_st)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 각 막대의 전체 길이는 총 수업일수를 나타내며, 내부 색상 비율을 통해 결석이 유독 많은 프로그램을 쉽게 색출할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -1127,9 +1124,9 @@ elif st.session_state.menu_option == UI['menu4']:
                             agg_df.plot(kind='bar', stacked=True, ax=ax_att, color=colors, edgecolor='white')
                             ax_att.set_ylabel('Days Count')
                             ax_att.set_xlabel('')
-                            plt.xticks(rotation=15, ha='right')
+                            plt.xticks(rotation=45, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
-                            st.pyplot(fig_att, use_container_width=True)
+                            st.pyplot(fig_att, format="svg", use_container_width=True)
                             plt.close(fig_att)
                             
                             st.divider()
@@ -1354,12 +1351,68 @@ elif st.session_state.menu_option == UI['menu4']:
                                     st.markdown(f"<div class='crm-child-name'>👦👧 {c_name} 수강 이력</div>", unsafe_allow_html=True)
                                     for h in histories:
                                         st.markdown(f"&nbsp;&nbsp; └ {h}", unsafe_allow_html=True)
-                                st.markdown("</div></div>", unsafe_allow_html=True)
-                            else:
                                 st.markdown("</div>", unsafe_allow_html=True)
+                                
+                            # ✨ [신규 추가] 가족 상세 정보(CRM) 열람 버튼
+                            if p.get('details'):
+                                with st.expander(f"📋 {p['name']} 가족 상세 프로필 (연락처/결제) 열람"):
+                                    for m_name, d_info in p['details'].items():
+                                        st.write(f"**👤 {m_name}** <span style='font-size:0.8em;color:gray;'>({d_info.get('relation','미기입')})</span>", unsafe_allow_html=True)
+                                        col_d1, col_d2 = st.columns(2)
+                                        col_d1.caption(f"📞 전화번호: {d_info.get('phone','')}")
+                                        col_d2.caption(f"📧 이메일: {d_info.get('email','')}")
+                                        st.caption(f"🏠 주소: {d_info.get('address','')}")
+                                        st.caption(f"💳 결제정보: {d_info.get('payment','')}")
+                                        if d_info.get('note'):
+                                            st.caption(f"📝 비고: {d_info.get('note','')}")
+                                        st.divider()
+                            st.markdown("</div>", unsafe_allow_html=True)
                     
+                    # ✨ [신규 추가] 가족 구성원별 상세 정보(CRM) 입력/수정 폼
                     st.divider()
-                    st.write(f"#### ✏️ 기존 {T_PARENT} 정보 수정 (자녀 추가)")
+                    st.write(f"#### 📝 가족 구성원 상세 프로필(CRM) 관리")
+                    st.info(f"가족 계정에 묶여 있는 대표 {T_PARENT}님과 자녀({T_USER}) 개개인의 세부 연락처 및 결제 정보를 기록합니다.")
+                    
+                    crm_p_name = st.selectbox(f"상세 정보를 관리할 {T_PARENT} 계정 선택", [p['name'] for p in db['parents']], key="crm_detail_select")
+                    crm_p = next(p for p in db['parents'] if p['name'] == crm_p_name)
+                    
+                    crm_members = [crm_p['name']] + [s['name'] for s in crm_p.get('linked_students', [])]
+                    
+                    # 중복된 이름 제거 (같은 아이가 여러 프로그램 들을 경우 방지)
+                    unique_members = list(dict.fromkeys(crm_members))
+                    
+                    if 'details' not in crm_p: 
+                        crm_p['details'] = {}
+                    
+                    with st.form("crm_details_form"):
+                        member_tabs = st.tabs([f"👤 {m}" for m in unique_members])
+                        updated_details = {}
+                        
+                        for m_idx, m_name in enumerate(unique_members):
+                            with member_tabs[m_idx]:
+                                m_detail = crm_p['details'].get(m_name, {})
+                                c1, c2 = st.columns(2)
+                                rel = c1.text_input("가족관계 (예: 모, 부, 자녀)", value=m_detail.get('relation', ''), key=f"rel_{crm_p_name}_{m_name}")
+                                phone = c2.text_input("전화번호", value=m_detail.get('phone', ''), key=f"phone_{crm_p_name}_{m_name}")
+                                email = c1.text_input("이메일", value=m_detail.get('email', ''), key=f"email_{crm_p_name}_{m_name}")
+                                addr = c2.text_input("주소", value=m_detail.get('address', ''), key=f"addr_{crm_p_name}_{m_name}")
+                                payment = st.text_input("결제관련 (금액, 납입일, 방법 등)", value=m_detail.get('payment', ''), key=f"pay_{crm_p_name}_{m_name}")
+                                note = st.text_area("비고 (특이사항)", value=m_detail.get('note', ''), key=f"note_{crm_p_name}_{m_name}")
+                                
+                                updated_details[m_name] = {
+                                    "relation": rel, "phone": phone, "email": email, 
+                                    "address": addr, "payment": payment, "note": note
+                                }
+                        
+                        if st.form_submit_button("가족 상세 프로필 저장", type="primary"):
+                            crm_p['details'] = updated_details
+                            if save_data(db):
+                                st.success("상세 프로필이 완벽하게 저장되었습니다!")
+                                time.sleep(1)
+                                st.rerun()
+
+                    st.divider()
+                    st.write(f"#### ⚙️ 기존 {T_PARENT} 계정 기본 정보 변경 (자녀 추가/이름 변경)")
                     p_to_edit_name = st.selectbox(f"수정할 {T_PARENT} 선택", [p['name'] for p in db['parents']])
                     p_to_edit = next(p for p in db['parents'] if p['name'] == p_to_edit_name)
                     
@@ -1373,7 +1426,7 @@ elif st.session_state.menu_option == UI['menu4']:
                         
                         new_linked_sts = st.multiselect(f"연결할 {T_USER} 다중 선택 (기존 자녀 + 새 자녀)", all_students, default=valid_current)
                         
-                        if st.form_submit_button(f"{T_PARENT} 정보 수정 저장", type="primary"):
+                        if st.form_submit_button(f"{T_PARENT} 기본 정보 수정 저장", type="primary"):
                             if new_p_name and len(new_p_pin) == 4 and new_p_pin.isdigit():
                                 p_to_edit['name'] = new_p_name
                                 p_to_edit['pin'] = new_p_pin
@@ -1394,7 +1447,7 @@ elif st.session_state.menu_option == UI['menu4']:
 
                     st.divider()
                     st.write(f"#### 🗑️ {T_PARENT} 계정 영구 삭제")
-                    del_p = st.selectbox("삭제할 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed")
+                    del_p = st.selectbox("삭제할 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed", key="del_p_select")
                     if st.button("❌ 선택한 가족 계정 전체 삭제"):
                         db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
                         if save_data(db): st.rerun()
