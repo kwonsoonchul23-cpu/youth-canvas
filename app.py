@@ -735,7 +735,7 @@ elif st.session_state.menu_option == UI['menu4']:
         admin_info = st.session_state['logged_admin']
         is_super = (admin_info['role'] == 'super')
         is_staff = (admin_info['role'] == 'staff')
-        is_normal = (admin_info['role'] == 'normal') # ✨ FIX: is_normal 변수 추가!
+        is_normal = (admin_info['role'] == 'normal') 
         
         # ✨ 권한별 열람 가능한 프로그램 리스트
         if is_super or is_staff:
@@ -754,8 +754,8 @@ elif st.session_state.menu_option == UI['menu4']:
             tabs = st.tabs(["📈 경영 대시보드", "💳 행정/재무 관리", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "📝 신규 개설", "🎨 화면 설정", "⚙️ 정보 수정", "🔐 계정 관리"])
             tab_dashboard, tab_finance, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_create, tab_ui, tab_edit, tab_settings = tabs
         elif is_staff:
-            tabs = st.tabs(["📈 경영 대시보드", "💳 행정/재무 관리", "📊 종합 명단", "🔐 계정 관리"])
-            tab_dashboard, tab_finance, tab_overview, tab_settings = tabs
+            tabs = st.tabs(["📈 경영 대시보드", "💳 행정/재무 관리", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "📝 신규 개설", "⚙️ 정보 수정", "🔐 계정 관리"])
+            tab_dashboard, tab_finance, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_create, tab_edit, tab_settings = tabs
         else:
             tabs = st.tabs(["📈 경영 대시보드", "📝 평가/코멘트 작성", "📊 종합 명단", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "⚙️ 정보 수정", "🔐 계정 관리"])
             tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_edit, tab_settings = tabs
@@ -985,8 +985,12 @@ elif st.session_state.menu_option == UI['menu4']:
                         st.markdown("##### 📋 통합 결제 내역 데이터베이스")
                         if db.get('payments'):
                             df_pay = pd.DataFrame(db['payments']).sort_values('date', ascending=False)
-                            df_pay['amount_fmt'] = df_pay['amount'].apply(lambda x: f"{x:,} 원")
                             
+                            # ✨ 결제 내역 엑셀(CSV) 다운로드 버튼 추가
+                            csv_data = df_pay.drop(columns=['id']).rename(columns={'date': '결제일', 'student': '학생', 'category': '항목', 'amount': '금액', 'method': '결제수단', 'note': '비고', 'recorded_by': '입력담당자'}).to_csv(index=False).encode('utf-8-sig')
+                            st.download_button("📥 전체 결제 내역 엑셀(CSV) 다운로드", data=csv_data, file_name=f"Payments_{today_str}.csv", mime="text/csv")
+                            
+                            df_pay['amount_fmt'] = df_pay['amount'].apply(lambda x: f"{x:,} 원")
                             st.dataframe(df_pay[['date', 'student', 'category', 'amount_fmt', 'method', 'note', 'recorded_by']].rename(columns={
                                 'date': '결제일', 'student': '학생', 'category': '항목', 'amount_fmt': '금액', 
                                 'method': '결제수단', 'note': '비고', 'recorded_by': '입력담당자'
@@ -1003,6 +1007,7 @@ elif st.session_state.menu_option == UI['menu4']:
                 with fin_tab2:
                     staff_perm = admin_info.get('staff_permission', 'full') if is_super else admin_info.get('staff_permission', 'entry')
                     
+                    # ✨ 2단계 권한 제어: 'full' 권한이 있는 관리자/행정만 열람 가능
                     if staff_perm == 'full':
                         st.markdown("##### 📈 기관 전체 재무 상태 및 매출 분석")
                         if not db.get('payments'):
@@ -1012,25 +1017,28 @@ elif st.session_state.menu_option == UI['menu4']:
                             total_rev = df_p['amount'].sum()
                             st.metric("💰 누적 총 매출 금액", f"{total_rev:,} 원")
                             
-                            f_col1, f_col2 = st.columns(2)
-                            with f_col1:
-                                with st.container(border=True):
-                                    st.markdown("###### 📊 항목별 매출 비율 (도넛 차트)")
-                                    fig_p1, ax_p1 = plt.subplots(figsize=(6, 4))
-                                    cat_sum = df_p.groupby('category')['amount'].sum()
-                                    ax_p1.pie(cat_sum, labels=cat_sum.index, autopct='%1.1f%%', startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'), colors=sns.color_palette('pastel'))
-                                    st.pyplot(fig_p1, use_container_width=True)
-                                    plt.close(fig_p1)
+                            # 매출 시각화 그래프 생성
+                            fig_finance, (ax_f1, ax_f2) = plt.subplots(1, 2, figsize=(12, 5))
                             
-                            with f_col2:
-                                with st.container(border=True):
-                                    st.markdown("###### 📈 일자별 매출 추이 (막대 그래프)")
-                                    fig_p2, ax_p2 = plt.subplots(figsize=(6, 4))
-                                    date_sum = df_p.groupby('date')['amount'].sum().reset_index()
-                                    sns.barplot(data=date_sum, x='date', y='amount', ax=ax_p2, palette='viridis')
-                                    ax_p2.tick_params(axis='x', rotation=45)
-                                    st.pyplot(fig_p2, use_container_width=True)
-                                    plt.close(fig_p2)
+                            # 1. 항목별 매출 도넛 차트
+                            cat_sum = df_p.groupby('category')['amount'].sum()
+                            ax_f1.pie(cat_sum, labels=cat_sum.index, autopct='%1.1f%%', startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'), colors=sns.color_palette('pastel'))
+                            ax_f1.set_title("항목별 매출 구성 비율")
+                            
+                            # 2. 일자별 매출 막대 그래프
+                            date_sum = df_p.groupby('date')['amount'].sum().reset_index()
+                            sns.barplot(data=date_sum, x='date', y='amount', ax=ax_f2, palette='viridis')
+                            ax_f2.tick_params(axis='x', rotation=45)
+                            ax_f2.set_title("일자별 매출 추이")
+                            
+                            st.pyplot(fig_finance, use_container_width=True)
+                            
+                            # ✨ 재무 시각화 그래프 고화질 PNG 저장 버튼
+                            buf_fin = io.BytesIO()
+                            fig_finance.savefig(buf_fin, format="png", bbox_inches='tight', dpi=300)
+                            buf_fin.seek(0)
+                            st.download_button("📥 재무/매출 통계 차트 이미지(PNG) 다운로드", data=buf_fin, file_name=f"Finance_Charts_{today_str}.png", mime="image/png")
+                            plt.close(fig_finance)
                             
                             st.markdown("#### 💡 AI 재무 건전성 분석 리포트")
                             top_cat = cat_sum.idxmax()
@@ -1040,7 +1048,7 @@ elif st.session_state.menu_option == UI['menu4']:
                         st.error("🔒 **접근 제한:** 해당 페이지는 매출 시각화 및 세무 통계를 제공합니다. 열람 권한이 부여된 '최고관리자' 또는 '전체 열람 권한 행정직원'만 접근할 수 있습니다. (현재 단순 입력 모드)")
 
         # ---------------------------------------------------------
-        if is_super or is_normal:
+        if is_super or is_normal or is_staff:
             with tab_eval:
                 st.subheader(f"📝 {T_USER} 주차/과업별 달성도 및 코멘트 평가")
                 if not my_programs: st.info("담당 프로그램이 없습니다.")
@@ -1510,7 +1518,145 @@ elif st.session_state.menu_option == UI['menu4']:
                             if save_data(db): st.rerun()
 
         # ---------------------------------------------------------
-        # 오직 Super 관리자만 접근 가능한 탭
+        # 오직 Super 관리자만 접근 가능한 탭 (UI, 시스템 계정 관리 등)
+        if is_super or is_staff or is_normal:
+            with tab_settings:
+                with st.form("pin_form"):
+                    npin = st.text_input("내 계정 새 비밀번호 변경 (4자리)", type="password", max_chars=4)
+                    if st.form_submit_button("변경 적용"):
+                        if len(npin) == 4 and npin.isdigit():
+                            adm = next(a for a in db['admins'] if a['name'] == admin_info['name'])
+                            op = adm['pin']; adm['pin'] = npin
+                            if save_data(db): st.success("변경 완료. 다시 로그인하세요."); time.sleep(1); st.session_state['admin_logged_in'] = False; st.rerun()
+                            else: adm['pin'] = op
+                        else: st.error("4자리 숫자로 입력해주세요.")
+                
+                if is_super:
+                    st.divider()
+                    st.subheader("💾 전체 시스템 데이터 백업")
+                    st.info("💡 시스템 랜섬웨어 대비 및 오프라인 데이터 보관을 위해 전체 시스템 데이터를 파일(JSON)로 다운로드할 수 있습니다.")
+                    json_string = json.dumps(db, ensure_ascii=False, indent=2)
+                    st.download_button(
+                        label="📥 전체 데이터 원클릭 백업 (JSON 다운로드)",
+                        file_name=f"YouthCanvas_Full_Backup_{datetime.now().strftime('%Y%m%d')}.json",
+                        mime="application/json",
+                        data=json_string,
+                        type="primary"
+                    )
+                    
+                    with st.container(border=True):
+                        st.subheader("🔤 맞춤형 호칭 설정 (명칭 변수 변경)")
+                        st.info("💡 기관의 성격에 맞게 시스템상에서 사람을 부르는 호칭을 일괄 변경하세요.")
+                        with st.form("terms_form"):
+                            c1, c2, c3 = st.columns(3)
+                            new_t_super = c1.text_input("최고관리자 호칭", value=T_SUPER)
+                            new_t_admin = c2.text_input("일반관리자(선생님) 호칭", value=T_ADMIN)
+                            new_t_staff = c3.text_input("행정직원 호칭", value=T_STAFF)
+                            
+                            c4, c5, _ = st.columns(3)
+                            new_t_user = c4.text_input("이용자(학생) 호칭", value=T_USER)
+                            new_t_parent = c5.text_input("보호자(학부모) 호칭", value=T_PARENT)
+                            
+                            if st.form_submit_button("호칭 변경 적용", type="primary"):
+                                db['settings']['terms'] = {"super": new_t_super, "admin": new_t_admin, "staff": new_t_staff, "user": new_t_user, "parent": new_t_parent}
+                                if save_data(db):
+                                    st.success("시스템 호칭이 성공적으로 변경되었습니다!")
+                                    time.sleep(1)
+                                    st.rerun()
+                    
+                    with st.container(border=True):
+                        st.subheader(f"👑 {T_SUPER}: 직원/행정 계정 발급 및 관리")
+                        with st.form("new_admin_form"):
+                            st.write(f"**➕ 신규 직원 계정 생성**")
+                            colA, colB = st.columns(2)
+                            new_adm_name = colA.text_input(f"이름 (예: 김철수 선생님)")
+                            new_adm_pin = colB.text_input("초기 비밀번호 4자리", max_chars=4)
+                            
+                            # ✨ 신규: 역할 선택 분기
+                            role_type = st.radio("계정 유형 선택", [f"{T_ADMIN} (수업/평가)", f"{T_STAFF} (결제/재무)"], horizontal=True)
+                            
+                            staff_perm = "entry"
+                            assign_progs = []
+                            
+                            if T_STAFF in role_type:
+                                staff_perm_label = st.selectbox("행정 권한 수준 부여", ["단순 입력 및 수정 (통계/시각화 열람 불가)", "재무/통계 전체 열람 (세무 수준 열람 가능)"])
+                                staff_perm = "entry" if "단순" in staff_perm_label else "full"
+                            else:
+                                all_prog_titles = [p['title'] for p in db['programs']]
+                                assign_progs = st.multiselect("담당 프로그램 할당", all_prog_titles)
+                            
+                            if st.form_submit_button(f"직원 계정 생성", type="primary"):
+                                if not new_adm_name or len(new_adm_pin) != 4 or not new_adm_pin.isdigit():
+                                    st.error("이름과 4자리 숫자 비밀번호를 정확히 입력하세요.")
+                                else:
+                                    r_val = "staff" if T_STAFF in role_type else "normal"
+                                    db['admins'].append({"name": new_adm_name, "pin": new_adm_pin, "role": r_val, "programs": assign_progs, "staff_permission": staff_perm})
+                                    if save_data(db):
+                                        st.success(f"[{new_adm_name}] 계정이 생성되었습니다!"); time.sleep(1); st.rerun()
+                                    else:
+                                        db['admins'].pop()
+                        
+                        st.write(f"#### 📋 등록된 직원 목록")
+                        df_admins = pd.DataFrame([{
+                            "이름": a['name'], 
+                            "권한 유형": T_SUPER if a['role'] == "super" else (T_STAFF if a['role'] == 'staff' else T_ADMIN), 
+                            "세부 권한": "전체 열람" if a.get('staff_permission')=='full' else ("단순 입력" if a.get('staff_permission')=='entry' else ", ".join(a.get('programs', [])))
+                        } for a in db['admins']])
+                        st.dataframe(df_admins, hide_index=True, use_container_width=True)
+                        
+                        st.divider()
+                        st.write(f"#### ✏️ 기존 직원 정보/권한 수정")
+                        normal_admins = [a['name'] for a in db['admins'] if a['role'] != 'super']
+                        if normal_admins:
+                            a_to_edit_name = st.selectbox("수정할 직원 선택", normal_admins)
+                            a_to_edit = next(a for a in db['admins'] if a['name'] == a_to_edit_name)
+                            
+                            with st.form("edit_admin_form"):
+                                c1, c2 = st.columns(2)
+                                new_a_name = c1.text_input("새 이름", value=a_to_edit['name'])
+                                new_a_pin = c2.text_input("새 비밀번호 (4자리)", value=a_to_edit['pin'], max_chars=4)
+                                
+                                # ✨ 수정 시에도 권한 분기 적용
+                                if a_to_edit['role'] == 'staff':
+                                    curr_perm = a_to_edit.get('staff_permission', 'entry')
+                                    perm_idx = 1 if curr_perm == 'full' else 0
+                                    staff_perm_label_edit = st.selectbox("행정 권한 수준 수정", ["단순 입력 및 수정 (통계/시각화 열람 불가)", "재무/통계 전체 열람 (세무 수준 열람 가능)"], index=perm_idx)
+                                    new_assign_progs = a_to_edit.get('programs', [])
+                                else:
+                                    all_prog_titles = [p['title'] for p in db['programs']]
+                                    valid_progs = [p for p in a_to_edit.get('programs', []) if p in all_prog_titles]
+                                    new_assign_progs = st.multiselect("담당 프로그램 수정", all_prog_titles, default=valid_progs)
+                                    staff_perm_label_edit = None
+                                
+                                if st.form_submit_button("정보 수정 저장", type="primary"):
+                                    if new_a_name and len(new_a_pin) == 4 and new_a_pin.isdigit():
+                                        a_to_edit['name'] = new_a_name
+                                        a_to_edit['pin'] = new_a_pin
+                                        if a_to_edit['role'] == 'staff':
+                                            a_to_edit['staff_permission'] = "full" if "전체" in staff_perm_label_edit else "entry"
+                                        else:
+                                            a_to_edit['programs'] = new_assign_progs
+                                        if save_data(db):
+                                            st.success("수정 완료!")
+                                            time.sleep(1)
+                                            st.rerun()
+                                    else:
+                                        st.error("올바른 값을 입력하세요.")
+
+                            st.divider()
+                            st.write(f"#### 🗑️ 직원 계정 강제 삭제")
+                            col_del1, col_del2 = st.columns([8, 2])
+                            admin_to_delete = col_del1.selectbox("삭제할 계정을 선택하세요", normal_admins, label_visibility="collapsed", key="del_admin_select")
+                            if col_del2.button("❌ 선택 계정 삭제", type="primary", use_container_width=True):
+                                temp_admins = copy.deepcopy(db['admins'])
+                                db['admins'] = [a for a in db['admins'] if a['name'] != admin_to_delete]
+                                if save_data(db):
+                                    st.success(f"[{admin_to_delete}] 계정이 성공적으로 삭제되었습니다."); time.sleep(1); st.rerun()
+                                else:
+                                    db['admins'] = temp_admins
+                        else:
+                            st.info("현재 수정하거나 삭제할 수 있는 직원이 없습니다.")
+
         if is_super:
             with tab_ui:
                 st.subheader("🎨 화면 UI 및 텍스트 맞춤 설정")
