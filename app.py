@@ -11,7 +11,7 @@ import io
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
-import matplotlib.pyplot as plt 
+import matplotlib.subplots as plt 
 import seaborn as sns 
 import matplotlib.font_manager as fm
 
@@ -66,7 +66,7 @@ st.markdown("""
     .cal-day-num { font-weight: bold; color: #475569; margin-bottom: 2px; padding-right: 5px; text-align: right; }
     .cal-event { color: #ffffff; padding: 3px 5px; margin-bottom: 2px; font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-    /* 사이드바 UI 커스텀 (메뉴 4개 컬러 배분) */
+    /* 사이드바 UI 커스텀 */
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
@@ -85,6 +85,13 @@ st.markdown("""
     .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
     .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
     .info-text { color: #475569; font-weight: 500;}
+    
+    /* 가족 CRM 카드 디자인 */
+    .crm-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; border-left: 6px solid #2b7a78; }
+    .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
+    .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
+    .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
+    .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -112,7 +119,6 @@ def get_date_label(task_dict):
 
 def safe_key(text): return re.sub(r'[\.\$#\[\]/]', '_', text)
 
-# ✨ [핵심 추가] 특정 사용자의 '역할(Role)' 유효 기간(Min~Max) 안에 해당 날짜가 포함되는지 검사하는 함수
 def is_active_role_period(u_dict, target_date_str):
     u_dates = []
     for t in u_dict.get('workflow', []):
@@ -121,9 +127,7 @@ def is_active_role_period(u_dict, target_date_str):
             if d_str and re.match(r'\d{4}-\d{2}-\d{2}', d_str):
                 try: u_dates.append(datetime.strptime(d_str.strip(), "%Y-%m-%d").date())
                 except: pass
-    
-    if not u_dates: return True # 날짜가 아예 지정되지 않은 역할은 항상 표시(예외 방어)
-    
+    if not u_dates: return True 
     try:
         target_d_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
         return min(u_dates) <= target_d_obj <= max(u_dates)
@@ -350,7 +354,6 @@ elif st.session_state.menu_option == UI['menu2']:
                         pct = int((d_items/t_items)*100) if t_items > 0 else 0
                         avg_s = sum(s_list)/len(s_list) if s_list else 0
                         
-                        # ✨ 학생용: 출석 통계 계산 시 역할별 기간 조건 적용
                         for d_key, att_info in d.get('attendance', {}).items():
                             if is_active_role_period(d, d_key):
                                 st_val = att_info.get('status')
@@ -522,7 +525,6 @@ elif st.session_state.menu_option == UI['menu3']:
                             avg_s = sum(s_list)/len(s_list) if s_list else 0
                             
                             s_att = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}
-                            # ✨ 학부모용: 출석 통계 계산 시 역할별 기간 조건 적용
                             for d_key, att_info in s_record.get('attendance', {}).items():
                                 if is_active_role_period(s_record, d_key):
                                     st_val = att_info.get('status')
@@ -744,7 +746,6 @@ elif st.session_state.menu_option == UI['menu4']:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     avg_score = sum(t_scores) / len(t_scores) if t_scores else 0
                     
-                    # ✨ 관리자 대시보드: 출결 점검 시 해당 학생의 역할 기간만 체크하도록 수정
                     att_counts = 0
                     for d_key, v in u.get('attendance', {}).items():
                         if is_active_role_period(u, d_key) and v.get('status') == '출석':
@@ -901,7 +902,6 @@ elif st.session_state.menu_option == UI['menu4']:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
                     
-                    # ✨ 관리자 명단: 출결 점검 시 해당 학생의 역할 기간만 체크하도록 수정
                     att_counts = 0
                     for d_key, v in u.get('attendance', {}).items():
                         if is_active_role_period(u, d_key) and v.get('status') == '출석':
@@ -980,7 +980,6 @@ elif st.session_state.menu_option == UI['menu4']:
                         att_date_obj = st.date_input("🗓️ 출석을 기록할 날짜 선택 (프로그램 기간만 선택 가능)", **date_kwargs)
                         att_date = att_date_obj.strftime("%Y-%m-%d")
                         
-                        # ✨ [핵심 기능 적용] 선택된 날짜에 스케줄이 유효한 역할(학생)만 추출
                         active_pu = []
                         for idx, u in pu:
                             if is_active_role_period(u, att_date):
@@ -1021,7 +1020,6 @@ elif st.session_state.menu_option == UI['menu4']:
                         for i, u in pu:
                             disp_name = u.get('alias') or u['name']
                             for d_key, info in u.get('attendance', {}).items():
-                                # ✨ [핵심 기능 적용] 해당 역할의 유효 기간 내에 있는 데이터만 시각화에 반영
                                 if is_active_role_period(u, d_key):
                                     att_records.append({
                                         f"{T_USER}명": f"{disp_name}({u['role']})",
@@ -1192,9 +1190,12 @@ elif st.session_state.menu_option == UI['menu4']:
                     if st.button(f"❌ {T_USER} 강제 퇴소(삭제)"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
+        # ==============================================================
+        # ✨ [핵심 기능] 가족(학부모) 단위 통합 CRM 관리 UI 개편
+        # ==============================================================
         with tab_parents:
-            st.subheader(f"👨‍👩‍👧 {T_PARENT} 계정 발급 및 관리")
-            st.info(f"💡 {T_PARENT} 전용 계정을 만들거나 수정하고, 열람할 수 있는 대상을 연결합니다.")
+            st.subheader(f"👨‍👩‍👧 {T_PARENT} 통합 CRM (가족 단위 관리)")
+            st.info(f"💡 다둥이(형제/자매)가 등록할 경우, 새로운 {T_PARENT} 계정을 만들지 말고 **기존 계정에서 '수정'을 통해 자녀를 추가**하세요. 장기적인 수강 이력 관리가 가능해집니다.")
             
             if not my_programs:
                 st.warning("담당 중인 프로그램이 없습니다.")
@@ -1202,17 +1203,17 @@ elif st.session_state.menu_option == UI['menu4']:
                 with st.form("parent_create_form"):
                     st.write(f"**➕ 신규 {T_PARENT} 계정 발급**")
                     col1, col2 = st.columns(2)
-                    p_name = col1.text_input(f"{T_PARENT} 이름 (예: 권해리 어머니)")
+                    p_name = col1.text_input(f"{T_PARENT} 대표 이름 (예: 김철수/김영희 어머니)")
                     p_pin = col2.text_input(f"{T_PARENT}용 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
                     
                     all_students = [f"{u['name']} - {u['program']} ({u['role']})" for u in db['users'] if u['program'] in my_programs]
-                    linked_sts = st.multiselect(f"이 계정과 연결할 {T_USER} 선택 (다중 선택 가능)", all_students)
+                    linked_sts = st.multiselect(f"이 계정과 연결할 {T_USER} 선택 (다둥이 다중 선택 가능)", all_students)
                     
-                    if st.form_submit_button(f"{T_PARENT} 계정 신규 발급", type="primary"):
+                    if st.form_submit_button(f"새로운 {T_PARENT} 계정 생성", type="primary"):
                         if p_name and len(p_pin) == 4 and p_pin.isdigit() and linked_sts:
                             existing_p = next((p for p in db['parents'] if p['name'] == p_name), None)
                             if existing_p:
-                                st.error("이미 존재하는 이름입니다. 정보 수정을 이용해주세요.")
+                                st.error("이미 존재하는 이름입니다. 정보 수정을 이용해 자녀를 추가해주세요.")
                             else:
                                 parsed_students = []
                                 for st_str in linked_sts:
@@ -1222,24 +1223,67 @@ elif st.session_state.menu_option == UI['menu4']:
                                     
                                 db['parents'].append({"name": p_name, "pin": p_pin, "linked_students": parsed_students})
                                 if save_data(db):
-                                    st.success(f"[{p_name}] 계정이 신규 발급되었습니다!")
+                                    st.success(f"[{p_name}] 가족 계정이 신규 생성되었습니다!")
                                     time.sleep(1)
                                     st.rerun()
                         else:
                             st.error("이름, 4자리 숫자 비밀번호, 연결할 대상을 모두 올바르게 입력해주세요.")
                             
                 if db.get('parents'):
-                    st.write(f"#### 📋 등록된 {T_PARENT} 목록")
+                    st.divider()
+                    st.markdown(f"#### 📋 {T_PARENT} 및 가족 수강 이력 카드")
+                    
+                    # ✨ 학부모별 연속 기록 계산 로직
                     for p in db['parents']:
-                        with st.expander(f"👨‍👩‍👧 **{p['name']}**님"):
-                            if p.get('linked_students'):
-                                for s in p['linked_students']:
-                                    st.markdown(f"🔹 **{T_USER}명:** {s['name']} &nbsp;&nbsp;|&nbsp;&nbsp; **참여 프로그램:** {s['program']}")
+                        children_history = defaultdict(list)
+                        first_date = "9999-12-31"
+                        
+                        for s in p.get('linked_students', []):
+                            s_name = s['name']
+                            s_prog = s['program']
+                            prog_obj = next((pr for pr in db['programs'] if pr['title'] == s_prog), None)
+                            
+                            if prog_obj:
+                                p_st = prog_obj.get('recruit_start', '')
+                                p_en = prog_obj.get('recruit_end', '')
+                                status_str = "진행중" if p_st <= today_str <= p_en else ("종료" if today_str > p_en else "예정")
+                                children_history[s_name].append(f"**{s_prog}** ({p_st} ~ {p_en}) - <span style='color:gray;font-size:0.9em;'>{status_str}</span>")
+                                if p_st and p_st < first_date: first_date = p_st
                             else:
-                                st.write("연결된 데이터가 없습니다.")
+                                children_history[s_name].append(f"**{s_prog}** (상세일정 없음)")
+                        
+                        display_first_date = first_date if first_date != "9999-12-31" else "기록 없음"
+                        child_names = list(children_history.keys())
+                        child_str = ", ".join(child_names) if child_names else "연결된 데이터 없음"
+                        
+                        # ✨ 아름다운 CRM 카드 렌더링
+                        with st.container():
+                            st.markdown(f"""
+                            <div class='crm-card'>
+                                <div style='display:flex; justify-content:space-between; align-items:baseline;'>
+                                    <div>
+                                        <div class='crm-title'>👨‍👩‍👧 {p['name']}</div>
+                                        <div class='crm-meta'><b>연결된 자녀:</b> {child_str}</div>
+                                    </div>
+                                    <div style='text-align:right;'>
+                                        <span class='badge-blue'>최초 등록일: {display_first_date}</span><br>
+                                        <span style='font-size:0.85em; color:gray;'>총 누적 수강: {sum(len(v) for v in children_history.values())}건</span>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            if children_history:
+                                st.markdown("<div class='crm-history-box'>", unsafe_allow_html=True)
+                                for c_name, histories in children_history.items():
+                                    st.markdown(f"<div class='crm-child-name'>👦👧 {c_name} 수강 이력</div>", unsafe_allow_html=True)
+                                    for h in histories:
+                                        st.markdown(f"&nbsp;&nbsp; └ {h}", unsafe_allow_html=True)
+                                st.markdown("</div></div>", unsafe_allow_html=True)
+                            else:
+                                st.markdown("</div>", unsafe_allow_html=True)
                     
                     st.divider()
-                    st.write(f"#### ✏️ 기존 {T_PARENT} 정보 수정")
+                    st.write(f"#### ✏️ 기존 {T_PARENT} 정보 수정 (자녀 추가)")
                     p_to_edit_name = st.selectbox(f"수정할 {T_PARENT} 선택", [p['name'] for p in db['parents']])
                     p_to_edit = next(p for p in db['parents'] if p['name'] == p_to_edit_name)
                     
@@ -1251,7 +1295,7 @@ elif st.session_state.menu_option == UI['menu4']:
                         current_linked = [f"{s['name']} - {s['program']} ({next((u['role'] for u in db['users'] if u['name']==s['name'] and u['program']==s['program']), '알수없음')})" for s in p_to_edit.get('linked_students', [])]
                         valid_current = [x for x in current_linked if x in all_students]
                         
-                        new_linked_sts = st.multiselect(f"연결할 {T_USER} 수정", all_students, default=valid_current)
+                        new_linked_sts = st.multiselect(f"연결할 {T_USER} 다중 선택 (기존 자녀 + 새 자녀)", all_students, default=valid_current)
                         
                         if st.form_submit_button(f"{T_PARENT} 정보 수정 저장", type="primary"):
                             if new_p_name and len(new_p_pin) == 4 and new_p_pin.isdigit():
@@ -1275,7 +1319,7 @@ elif st.session_state.menu_option == UI['menu4']:
                     st.divider()
                     st.write(f"#### 🗑️ {T_PARENT} 계정 영구 삭제")
                     del_p = st.selectbox("삭제할 계정 선택", [p['name'] for p in db['parents']], label_visibility="collapsed")
-                    if st.button("❌ 선택한 계정 삭제"):
+                    if st.button("❌ 선택한 가족 계정 전체 삭제"):
                         db['parents'] = [p for p in db['parents'] if p['name'] != del_p]
                         if save_data(db): st.rerun()
 
