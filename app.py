@@ -459,7 +459,7 @@ elif st.session_state.menu_option == UI['menu2']:
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 2-2] ✨ 학부모 전용 라운지 (다중 자녀/프로그램 통합 비교 지원)
+# [페이지 2-2] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['menu3']}")
@@ -482,9 +482,6 @@ elif st.session_state.menu_option == UI['menu3']:
                 if not linked_students:
                     st.info(f"아직 연결된 정보가 없습니다. 기관에 문의해주세요.")
                 else:
-                    # ==============================================================
-                    # ✨ [신규 기능] 자녀 종합 비교 대시보드 (다둥이 부모님용)
-                    # ==============================================================
                     p_summary_rows = []
                     att_counts_total = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}
                     
@@ -523,9 +520,6 @@ elif st.session_state.menu_option == UI['menu3']:
                     tab_names = ["🌟 자녀 종합 대시보드"] + [f"👦👧 {s['name']} ({s['program']})" for s in linked_students]
                     parent_tabs = st.tabs(tab_names)
                     
-                    # --------------------------------------------
-                    # 첫 번째 탭: 자녀 종합 분석 리포트
-                    # --------------------------------------------
                     with parent_tabs[0]:
                         if not p_summary_rows:
                             st.warning("데이터를 불러올 수 있는 연결된 자녀가 없습니다.")
@@ -535,7 +529,6 @@ elif st.session_state.menu_option == UI['menu3']:
                             
                             df_p_summ = pd.DataFrame(p_summary_rows)
                             
-                            # 차트 표시 영역
                             p_col1, p_col2 = st.columns(2)
                             with p_col1:
                                 with st.container(border=True):
@@ -573,7 +566,6 @@ elif st.session_state.menu_option == UI['menu3']:
                                             neg_msg = f"<div class='neg-text'>🔴 주의 요망: {names} {T_USER}의 일부 프로그램 성취도가 60점 미만입니다. 따뜻한 격려가 필요합니다.</div>"
                                         st.markdown(f"<div class='report-box'>{pos_msg}{neg_msg}</div>", unsafe_allow_html=True)
                             
-                            # AI 통합 리포트
                             st.markdown("#### 💡 자녀 통합 분석 리포트")
                             bad_att = [r['자녀명'] for r in p_summary_rows if r['결석_지각'] >= 3]
                             
@@ -601,9 +593,6 @@ elif st.session_state.menu_option == UI['menu3']:
                                      neg_text += "- **현재 상태:** 지각/결석이나 크게 부진한 과목 없이 자녀들이 아주 훌륭하게 활동을 소화하고 있습니다!\n"
                                  st.error(neg_text)
 
-                    # --------------------------------------------
-                    # 개별 자녀 상세 탭
-                    # --------------------------------------------
                     for idx, s_info in enumerate(linked_students):
                         with parent_tabs[idx + 1]:
                             s_record = next((u for u in db['users'] if u['name'] == s_info['name'] and u['program'] == s_info['program']), None)
@@ -956,32 +945,56 @@ elif st.session_state.menu_option == UI['menu4']:
 
                         att_date_obj = st.date_input("🗓️ 출석을 기록할 날짜 선택 (프로그램 기간만 선택 가능)", **date_kwargs)
                         att_date = att_date_obj.strftime("%Y-%m-%d")
-                        st.info(f"💡 선택하신 **{att_date}**의 출석을 입력합니다. 이미 기록된 내용이 있다면 아래에 표시됩니다.")
                         
-                        with st.form(f"att_form"):
-                            att_up = {}
-                            h1, h2, h3 = st.columns([3, 3, 4])
-                            h1.write(f"**{T_USER}명 (역할)**")
-                            h2.write("**상태**")
-                            h3.write("**비고**")
-                            st.divider()
+                        # ✨ [핵심 기능] 선택한 날짜에 해당하는 역할(Role)만 필터링하는 로직
+                        active_pu = []
+                        for idx, u in pu:
+                            u_dates = []
+                            for t in u.get('workflow', []):
+                                sd, ed = get_date_range(t)
+                                for d_str in [sd, ed]:
+                                    if d_str and re.match(r'\d{4}-\d{2}-\d{2}', d_str):
+                                        try: u_dates.append(datetime.strptime(d_str, "%Y-%m-%d").date())
+                                        except: pass
                             
-                            for idx, u in pu:
-                                curr_st = u.get('attendance', {}).get(att_date, {}).get('status', '출석')
-                                curr_nt = u.get('attendance', {}).get(att_date, {}).get('note', '')
-                                c1, c2, c3 = st.columns([3, 3, 4])
-                                c1.write(f"**{u.get('alias') or u['name']}**\n<br><span style='color:gray; font-size:0.8em;'>{u['role']}</span>", unsafe_allow_html=True)
-                                ns = c2.selectbox("상태", ["출석", "지각", "결석", "병결"], index=["출석", "지각", "결석", "병결"].index(curr_st), key=f"s_{idx}", label_visibility="collapsed")
-                                nn = c3.text_input("비고", value=curr_nt, key=f"n_{idx}", label_visibility="collapsed")
-                                att_up[idx] = {"status": ns, "note": nn}
+                            is_active = True
+                            if u_dates:
+                                u_min_d, u_max_d = min(u_dates), max(u_dates)
+                                if not (u_min_d <= att_date_obj <= u_max_d):
+                                    is_active = False
+                            
+                            if is_active:
+                                active_pu.append((idx, u))
+
+                        if not active_pu:
+                            st.info(f"💡 선택하신 **{att_date}**에 일정이 진행되는 {T_USER}(역할)이 없습니다. 날짜를 다시 확인해 주세요.")
+                        else:
+                            st.info(f"💡 선택하신 **{att_date}**의 출석을 입력합니다. 해당 날짜에 일정이 있는 역할만 표시됩니다.")
+                            
+                            with st.form(f"att_form"):
+                                att_up = {}
+                                h1, h2, h3 = st.columns([3, 3, 4])
+                                h1.write(f"**{T_USER}명 (역할)**")
+                                h2.write("**상태**")
+                                h3.write("**비고**")
+                                st.divider()
                                 
-                            st.write("")
-                            if st.form_submit_button("💾 출석 저장", type="primary", use_container_width=True):
-                                for idx, ad in att_up.items():
-                                    if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
-                                    db['users'][idx]['attendance'][att_date] = ad
-                                if save_data(db): 
-                                    st.success(f"{att_date} 출석 정보가 성공적으로 저장되었습니다!"); time.sleep(1); st.rerun()
+                                for idx, u in active_pu:
+                                    curr_st = u.get('attendance', {}).get(att_date, {}).get('status', '출석')
+                                    curr_nt = u.get('attendance', {}).get(att_date, {}).get('note', '')
+                                    c1, c2, c3 = st.columns([3, 3, 4])
+                                    c1.write(f"**{u.get('alias') or u['name']}**\n<br><span style='color:gray; font-size:0.8em;'>{u['role']}</span>", unsafe_allow_html=True)
+                                    ns = c2.selectbox("상태", ["출석", "지각", "결석", "병결"], index=["출석", "지각", "결석", "병결"].index(curr_st), key=f"s_{idx}", label_visibility="collapsed")
+                                    nn = c3.text_input("비고", value=curr_nt, key=f"n_{idx}", label_visibility="collapsed")
+                                    att_up[idx] = {"status": ns, "note": nn}
+                                    
+                                st.write("")
+                                if st.form_submit_button("💾 출석 저장", type="primary", use_container_width=True):
+                                    for idx, ad in att_up.items():
+                                        if 'attendance' not in db['users'][idx]: db['users'][idx]['attendance'] = {}
+                                        db['users'][idx]['attendance'][att_date] = ad
+                                    if save_data(db): 
+                                        st.success(f"{att_date} 출석 정보가 성공적으로 저장되었습니다!"); time.sleep(1); st.rerun()
 
                     with att_sub2:
                         st.markdown(f"#### 🔍 {T_USER}별 종합 출석부 및 시각화")
