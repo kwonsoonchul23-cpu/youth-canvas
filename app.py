@@ -11,7 +11,7 @@ import io
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
-import matplotlib.subplots as plt 
+import matplotlib.pyplot as plt  # ✨ 이 부분이 수정되었습니다! (subplots -> pyplot)
 import seaborn as sns 
 import matplotlib.font_manager as fm
 
@@ -1190,9 +1190,6 @@ elif st.session_state.menu_option == UI['menu4']:
                     if st.button(f"❌ {T_USER} 강제 퇴소(삭제)"):
                         db['users'].pop(t_idx); save_data(db); st.rerun()
 
-        # ==============================================================
-        # ✨ [핵심 기능] 가족(학부모) 단위 통합 CRM 관리 UI 개편
-        # ==============================================================
         with tab_parents:
             st.subheader(f"👨‍👩‍👧 {T_PARENT} 통합 CRM (가족 단위 관리)")
             st.info(f"💡 다둥이(형제/자매)가 등록할 경우, 새로운 {T_PARENT} 계정을 만들지 말고 **기존 계정에서 '수정'을 통해 자녀를 추가**하세요. 장기적인 수강 이력 관리가 가능해집니다.")
@@ -1233,7 +1230,6 @@ elif st.session_state.menu_option == UI['menu4']:
                     st.divider()
                     st.markdown(f"#### 📋 {T_PARENT} 및 가족 수강 이력 카드")
                     
-                    # ✨ 학부모별 연속 기록 계산 로직
                     for p in db['parents']:
                         children_history = defaultdict(list)
                         first_date = "9999-12-31"
@@ -1256,7 +1252,6 @@ elif st.session_state.menu_option == UI['menu4']:
                         child_names = list(children_history.keys())
                         child_str = ", ".join(child_names) if child_names else "연결된 데이터 없음"
                         
-                        # ✨ 아름다운 CRM 카드 렌더링
                         with st.container():
                             st.markdown(f"""
                             <div class='crm-card'>
