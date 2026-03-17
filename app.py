@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import json
 import os
 import re
@@ -42,6 +41,7 @@ def set_korean_font():
 set_korean_font()
 
 # --- [디자인 요소] 커스텀 CSS ---
+# ✨ 사이드바 메뉴 디자인 강제 적용 (업데이트된 Streamlit 구조에 맞게 강화)
 st.markdown("""
     <style>
     h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
@@ -58,8 +58,22 @@ st.markdown("""
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-bottom: 10px; }
     .schedule-table th { border: 1px solid #cbd5e1; padding: 8px; background-color: #f1f5f9; font-weight: bold; color: #334155; }
-    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; }
+    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; vertical-align: top; }
     .schedule-table td.task-content { text-align: left; }
+    
+    /* ✨ 잃어버렸던 사이드바 컬러 버튼 디자인 복구! */
+    [data-testid="stSidebar"] { background-color: #261633 !important; }
+    [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label { 
+        width: 100%; min-height: 65px; margin: 0 0 12px 0; padding: 10px 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #c13945 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background-color: #2b7a78 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #e68128 !important; } 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.3rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     
     /* 리포트 카드 디자인 */
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
@@ -221,9 +235,15 @@ if st.session_state.menu_option == UI['menu1']:
                     for t in tasks:
                         label = get_date_label(t)
                         date_val = label if label else "일정 미정"
+                        
+                        # ✨ [세부 일정 줄바꿈 완벽 수정] 쉼표 대신 <br> 태그와 띄어쓰기로 깔끔하게 정렬
                         sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
-                        if sub_texts: task_display = f"{t['task']} <br><span style='color:gray;font-size:0.85em;'>└ {', '.join(sub_texts)}</span>"
-                        else: task_display = t['task']
+                        if sub_texts:
+                            subs_html = "<br>".join([f"&nbsp;&nbsp;└ {desc}" for desc in sub_texts])
+                            task_display = f"<b>{t['task']}</b><br><span style='color:#64748b; font-size:0.9em;'>{subs_html}</span>"
+                        else:
+                            task_display = f"<b>{t['task']}</b>"
+                            
                         grouped_tasks[date_val].append({"role": role, "task": task_display})
                 
                 if grouped_tasks:
@@ -311,7 +331,6 @@ elif st.session_state.menu_option == UI['menu2']:
                     st.divider()
                     st.markdown(f"### 🌟 **{search_name}**님의 맞춤형 대시보드")
                     
-                    # ✨ [학생 전용] 원하는 차트 다중 선택 기능 탑재
                     s_chart_options = [
                         "막대 그래프 (프로그램별 성취도) [추천]", 
                         "도넛 차트 (나의 종합 출결 비율)", 
@@ -320,7 +339,6 @@ elif st.session_state.menu_option == UI['menu2']:
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
                     st.write("")
                     
-                    # 데이터 전처리
                     summary_rows = []
                     total_t_all = 0
                     total_d_all = 0
@@ -367,16 +385,16 @@ elif st.session_state.menu_option == UI['menu2']:
                     
                     df_summ = pd.DataFrame(summary_rows)
                     
-                    # 1. 막대 그래프 렌더링
+                    # ✨ [학생 차트] SVG 포맷 및 아담한 사이즈(6x4) 적용
                     if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
                             st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
-                            fig_s1, (ax_s1, ax_s2) = plt.subplots(1, 2, figsize=(15, 4))
+                            fig_s1, (ax_s1, ax_s2) = plt.subplots(1, 2, figsize=(10, 4))
                             sns.barplot(data=df_summ, x='프로그램', y='진행률(%)', ax=ax_s1, palette='mako')
                             ax_s1.set_ylim(0, 100); ax_s1.tick_params(axis='x', rotation=15)
                             sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
                             ax_s2.set_ylim(0, 100); ax_s2.tick_params(axis='x', rotation=15)
-                            st.pyplot(fig_s1)
+                            st.pyplot(fig_s1, format="svg", use_container_width=True)
                             plt.close(fig_s1)
                             
                             if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0:
@@ -385,7 +403,6 @@ elif st.session_state.menu_option == UI['menu2']:
                                 top_prog = df_summ.loc[df_summ['진행률(%)'].idxmax()]
                                 st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_prog['프로그램']}'의 달성률이 {top_prog['진행률(%)']}%로 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
 
-                    # 2. 도넛 차트 렌더링
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
                             st.markdown("##### 🍩 나의 종합 출결 비율 (도넛 차트)")
@@ -398,9 +415,9 @@ elif st.session_state.menu_option == UI['menu2']:
                                 colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                                 
                                 fig_d, ax_d = plt.subplots(figsize=(6, 4))
-                                wedges, texts, autotexts = ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
+                                ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                                 ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                                st.pyplot(fig_d)
+                                st.pyplot(fig_d, format="svg", use_container_width=True)
                                 plt.close(fig_d)
                                 
                                 bad_att = att_counts['지각'] + att_counts['결석']
@@ -409,7 +426,6 @@ elif st.session_state.menu_option == UI['menu2']:
                                 else:
                                     st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다. 성실한 참여를 위해 출결 관리에 신경 써주세요.</div></div>", unsafe_allow_html=True)
 
-                    # 3. 라인 그래프 렌더링
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
                             st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
@@ -417,10 +433,10 @@ elif st.session_state.menu_option == UI['menu2']:
                                 st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l, ax_l = plt.subplots(figsize=(10, 4))
+                                fig_l, ax_l = plt.subplots(figsize=(8, 4))
                                 sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                                 ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_l)
+                                st.pyplot(fig_l, format="svg", use_container_width=True)
                                 plt.close(fig_l)
                                 
                                 first_score = df_trend['점수'].iloc[0]
@@ -549,7 +565,6 @@ elif st.session_state.menu_option == UI['menu3']:
                         else:
                             st.markdown(f"### 🌟 **{p_info['name']}**님의 자녀 종합 대시보드")
                             
-                            # ✨ [학부모 전용] 원하는 차트 다중 선택 기능 탑재
                             p_chart_options = [
                                 "막대 그래프 (자녀별 성취도/진행률) [추천]", 
                                 "도넛 차트 (자녀 통합 출결 비율)", 
@@ -559,7 +574,7 @@ elif st.session_state.menu_option == UI['menu3']:
                             st.write("")
                             df_p_summ = pd.DataFrame(p_summary_rows)
                             
-                            # 1. 막대 그래프
+                            # ✨ [학부모 차트] SVG 포맷 및 반응형 사이즈 적용
                             if "막대 그래프 (자녀별 성취도/진행률) [추천]" in selected_p_charts and not df_p_summ.empty:
                                 p_col1, p_col2 = st.columns(2)
                                 with p_col1:
@@ -568,7 +583,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_p1, ax_p1 = plt.subplots(figsize=(6, 4))
                                         sns.barplot(data=df_p_summ, x='라벨', y='진행률(%)', ax=ax_p1, palette='mako')
                                         ax_p1.set_ylim(0, 100); ax_p1.tick_params(axis='x', rotation=15)
-                                        st.pyplot(fig_p1)
+                                        st.pyplot(fig_p1, format="svg", use_container_width=True)
                                         plt.close(fig_p1)
                                         
                                         if df_p_summ['진행률(%)'].max() == 0:
@@ -583,7 +598,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_p2, ax_p2 = plt.subplots(figsize=(6, 4))
                                         sns.barplot(data=df_p_summ, x='라벨', y='평균 성취도', ax=ax_p2, palette='flare')
                                         ax_p2.set_ylim(0, 100); ax_p2.tick_params(axis='x', rotation=15)
-                                        st.pyplot(fig_p2)
+                                        st.pyplot(fig_p2, format="svg", use_container_width=True)
                                         plt.close(fig_p2)
                                         
                                         if df_p_summ['평균 성취도'].max() == 0:
@@ -595,7 +610,6 @@ elif st.session_state.menu_option == UI['menu3']:
                                             neg_msg = f"<div class='neg-text'>🔴 주의 요망: {', '.join(low_s_df['자녀명'].unique())} {T_USER}의 성취도 보완이 필요합니다.</div>" if not low_s_df.empty else ""
                                             st.markdown(f"<div class='report-box'>{pos_msg}{neg_msg}</div>", unsafe_allow_html=True)
                             
-                            # 2. 도넛 차트
                             if "도넛 차트 (자녀 통합 출결 비율)" in selected_p_charts:
                                 with st.container(border=True):
                                     st.markdown("##### 🍩 자녀 통합 종합 출결 비율 (도넛 차트)")
@@ -610,7 +624,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_dp, ax_dp = plt.subplots(figsize=(6, 4))
                                         ax_dp.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                                         ax_dp.text(0, 0, f"총 {total_att_p}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                                        st.pyplot(fig_dp)
+                                        st.pyplot(fig_dp, format="svg", use_container_width=True)
                                         plt.close(fig_dp)
                                         
                                         bad_att_p = att_counts_total['지각'] + att_counts_total['결석']
@@ -619,7 +633,6 @@ elif st.session_state.menu_option == UI['menu3']:
                                         else:
                                             st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 자녀들의 지각/결석 누적이 총 {bad_att_p}회 입니다. 출결 독려를 부탁드립니다.</div></div>", unsafe_allow_html=True)
 
-                            # 3. 라인 차트
                             if "라인 그래프 (자녀별 성취도 추이)" in selected_p_charts:
                                 with st.container(border=True):
                                     st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
@@ -627,17 +640,17 @@ elif st.session_state.menu_option == UI['menu3']:
                                         st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                                     else:
                                         df_trend_p = pd.DataFrame(trend_data_p).sort_values(by="날짜")
-                                        fig_lp, ax_lp = plt.subplots(figsize=(10, 4))
+                                        fig_lp, ax_lp = plt.subplots(figsize=(8, 4))
                                         sns.lineplot(data=df_trend_p, x='날짜', y='점수', hue='자녀명', marker='o', ax=ax_lp)
                                         ax_lp.set_ylim(0, 105); ax_lp.tick_params(axis='x', rotation=45)
-                                        st.pyplot(fig_lp)
+                                        st.pyplot(fig_lp, format="svg", use_container_width=True)
                                         plt.close(fig_lp)
                                         st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 자녀들의 시간 흐름에 따른 성취도 변화를 직관적으로 비교할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
-                    # 개별 자녀 탭
                     for idx, s_info in enumerate(linked_students):
                         with parent_tabs[idx + 1]:
                             s_record = next((u for u in db['users'] if u['name'] == s_info['name'] and u['program'] == s_info['program']), None)
+                            
                             if s_record:
                                 st.markdown(f"### 🏅 [{s_record['program']}] 참가자 **{s_record['name']}**님")
                                 st.markdown(f"<span class='badge-blue'>담당 역할: {s_record['role']}</span>", unsafe_allow_html=True)
@@ -753,7 +766,6 @@ elif st.session_state.menu_option == UI['menu4']:
             if not users_to_show: 
                 st.info(f"데이터가 부족하여 대시보드를 생성할 수 없습니다. {T_USER}이 등록되고 평가가 진행되어야 합니다.")
             else:
-                # ✨ [관리자 전용] PDF 인포그래픽 기반 다중 차트 선택 기능
                 chart_options = [
                     "막대 그래프 (프로그램별 평균 성취도) [추천]",
                     "도넛 차트 (전체 출결 종합 비율)",
@@ -800,16 +812,14 @@ elif st.session_state.menu_option == UI['menu4']:
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                # ==============================================================
-                # 1. 막대 그래프 (비교)
-                # ==============================================================
+                # ✨ [관리자 차트] SVG 포맷 및 아담한 사이즈 적용
                 if "막대 그래프 (프로그램별 평균 성취도) [추천]" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
-                        fig1, ax1 = plt.subplots(figsize=(10, 4))
+                        fig1, ax1 = plt.subplots(figsize=(8, 4))
                         sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                         ax1.set_ylim(0, 100); ax1.tick_params(axis='x', rotation=15)
-                        st.pyplot(fig1)
+                        st.pyplot(fig1, format="svg", use_container_width=True)
                         plt.close(fig1)
 
                         valid_scores = df_dash[df_dash['AvgScore'] > 0]
@@ -823,9 +833,6 @@ elif st.session_state.menu_option == UI['menu4']:
                             st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_p}' 프로그램이 평균 {top_s:.1f}점으로 가장 우수합니다.</div>" +
                                         (f"<div class='neg-text'>🔴 주의 요망: '{low_p}' 프로그램이 평균 {low_s:.1f}점으로 부진합니다. 원인 파악이 필요합니다.</div></div>" if low_s < 60 else f"<div class='info-text'>ℹ️ 특이사항: 평균 60점 미만인 프로그램은 없습니다.</div></div>"), unsafe_allow_html=True)
 
-                # ==============================================================
-                # 2. 도넛 차트 (비율)
-                # ==============================================================
                 if "도넛 차트 (전체 출결 종합 비율)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 🍩 도넛 차트: 시설 전체 {T_USER} 출결 비율")
@@ -840,7 +847,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_d, ax_d = plt.subplots(figsize=(6, 4))
                             ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                             ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                            st.pyplot(fig_d)
+                            st.pyplot(fig_d, format="svg", use_container_width=True)
                             plt.close(fig_d)
                             
                             bad_ratio = ((att_counts_total['지각'] + att_counts_total['결석']) / total_att) * 100
@@ -849,9 +856,6 @@ elif st.session_state.menu_option == UI['menu4']:
                             else:
                                 st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 전체 결석 및 지각 비율이 {bad_ratio:.1f}%에 달합니다. 출결 관리 캠페인이 필요합니다.</div></div>", unsafe_allow_html=True)
 
-                # ==============================================================
-                # 3. 라인 그래프 (추세)
-                # ==============================================================
                 if "라인 그래프 (시간 흐름별 성취도 추이)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 📈 라인 그래프: 시간에 따른 프로그램 성과 변화")
@@ -862,13 +866,10 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_l, ax_l = plt.subplots(figsize=(10, 4))
                             sns.lineplot(data=df_t, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                             ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                            st.pyplot(fig_l)
+                            st.pyplot(fig_l, format="svg", use_container_width=True)
                             plt.close(fig_l)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 선이 우상향하면 성취도가 개선되는 추세이며, 우하향할 경우 학습 난이도 조절이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
-                # ==============================================================
-                # 4. 히트맵 (밀도)
-                # ==============================================================
                 if "히트맵 (일자별 출석 밀도 분석)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 🔲 히트맵: {T_USER}별 출결 패턴 밀도")
@@ -883,21 +884,18 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_h, ax_h = plt.subplots(figsize=(10, max(3, len(pivot_h)*0.5)))
                             sns.heatmap(pivot_h, cmap='RdYlGn', cbar=False, linewidths=.5, ax=ax_h)
                             ax_h.set_title("초록색: 출석, 노란색: 지각, 빨간색: 결석", fontsize=10, color='gray')
-                            st.pyplot(fig_h)
+                            st.pyplot(fig_h, format="svg", use_container_width=True)
                             plt.close(fig_h)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 붉은색이 연속해서 나타나는 행(특정 학생)이나 열(특정 요일)을 찾아 개별 면담이나 스케줄 보완을 진행하세요.</div></div>", unsafe_allow_html=True)
 
-                # ==============================================================
-                # 5. 산점도 (상관관계)
-                # ==============================================================
                 if "산점도 (선생님 피드백 효과 분석) [추천]" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 🎯 산점도: {T_ADMIN} 피드백 빈도와 {T_USER} 성과 상관관계")
-                        fig_s, ax_s = plt.subplots(figsize=(10, 4))
+                        fig_s, ax_s = plt.subplots(figsize=(8, 4))
                         sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax_s, palette='Set1', alpha=0.8)
                         ax_s.set_xlabel('Number of Comments Given')
                         ax_s.set_ylabel('Average Score')
-                        st.pyplot(fig_s)
+                        st.pyplot(fig_s, format="svg", use_container_width=True)
                         plt.close(fig_s)
 
                         valid_sc = df_dash[df_dash['AvgScore'] > 0]
@@ -914,9 +912,6 @@ elif st.session_state.menu_option == UI['menu4']:
                             else:
                                 st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 피드백 횟수와 성적 간에 뚜렷한 패턴이 관찰되지 않았습니다.</div></div>", unsafe_allow_html=True)
 
-                # ==============================================================
-                # 6. 스택 막대 그래프 (구성)
-                # ==============================================================
                 if "스택 막대 그래프 (출결 상세 비율)" in selected_charts:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 스택 막대 그래프: 프로그램별 출결 누적 구성")
@@ -924,7 +919,6 @@ elif st.session_state.menu_option == UI['menu4']:
                             st.info("📉 기록된 출석 데이터가 없습니다.")
                         else:
                             df_h = pd.DataFrame(heat_data)
-                            # 학생명 대신 프로그램을 매핑해야 함
                             prog_map = {u['name']: u['program'] for u in users_to_show}
                             df_h['Program'] = df_h['학생명'].map(prog_map)
                             
@@ -939,7 +933,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             ax_st.set_ylabel('Days Count')
                             plt.xticks(rotation=15, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
-                            st.pyplot(fig_st)
+                            st.pyplot(fig_st, format="svg", use_container_width=True)
                             plt.close(fig_st)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 각 막대의 전체 길이는 총 수업일수를 나타내며, 내부 색상 비율을 통해 결석이 유독 많은 프로그램을 쉽게 색출할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -1131,14 +1125,14 @@ elif st.session_state.menu_option == UI['menu4']:
                                 if col not in agg_df.columns: agg_df[col] = 0
                             agg_df = agg_df[['출석', '지각', '결석', '병결']]
                             
-                            fig_att, ax_att = plt.subplots(figsize=(12, 6))
+                            fig_att, ax_att = plt.subplots(figsize=(10, 4))
                             colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6']
                             agg_df.plot(kind='bar', stacked=True, ax=ax_att, color=colors, edgecolor='white')
                             ax_att.set_ylabel('Days Count')
                             ax_att.set_xlabel('')
-                            plt.xticks(rotation=45, ha='right')
+                            plt.xticks(rotation=15, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
-                            st.pyplot(fig_att)
+                            st.pyplot(fig_att, format="svg", use_container_width=True)
                             plt.close(fig_att)
                             
                             st.divider()
