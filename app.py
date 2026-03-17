@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import json
 import os
 import re
@@ -18,7 +19,7 @@ import matplotlib.font_manager as fm
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
 
-# --- ✨ 시각화 폰트 설정 (Streamlit 클라우드 한글 깨짐 100% 방어) ---
+# --- ✨ 시각화 폰트 설정 및 초고해상도(DPI) 세팅 ---
 @st.cache_resource
 def set_korean_font():
     font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
@@ -30,18 +31,19 @@ def set_korean_font():
         font_prop = fm.FontProperties(fname=font_path)
         font_name = font_prop.get_name()
         plt.rc('font', family=font_name)
-        plt.rcParams['axes.unicode_minus'] = False
-        sns.set_theme(style='whitegrid', font=font_name, font_scale=1.0)
     except:
         import platform
         if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
         elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
-        plt.rcParams['axes.unicode_minus'] = False
+    
+    # ✨ 한글 깨짐 방지 및 초고화질(300 DPI) 렌더링 설정 (확대 시 깨짐 방지)
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['figure.dpi'] = 300  
+    sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
 
 set_korean_font()
 
 # --- [디자인 요소] 커스텀 CSS ---
-# ✨ 사이드바 메뉴 디자인 강제 적용 (업데이트된 Streamlit 구조에 맞게 강화)
 st.markdown("""
     <style>
     h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
@@ -58,22 +60,8 @@ st.markdown("""
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-bottom: 10px; }
     .schedule-table th { border: 1px solid #cbd5e1; padding: 8px; background-color: #f1f5f9; font-weight: bold; color: #334155; }
-    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; vertical-align: top; }
+    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; }
     .schedule-table td.task-content { text-align: left; }
-    
-    /* ✨ 잃어버렸던 사이드바 컬러 버튼 디자인 복구! */
-    [data-testid="stSidebar"] { background-color: #261633 !important; }
-    [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label { 
-        width: 100%; min-height: 65px; margin: 0 0 12px 0; padding: 10px 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
-    }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #c13945 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background-color: #2b7a78 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #e68128 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.3rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     
     /* 리포트 카드 디자인 */
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
@@ -87,6 +75,20 @@ st.markdown("""
     .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
     .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
     .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
+    
+    /* 사이드바 UI 커스텀 */
+    [data-testid="stSidebar"] { background-color: #261633 !important; }
+    [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: 10px !important; margin-top: 1rem; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] { width: 100%; height: 75px; margin: 0; padding: 0 20px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] > div:nth-child(2) { width: 100%; padding-left: 15px; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"] p { font-size: 1.35rem !important; font-weight: 900 !important; color: #ffffff !important; padding: 0 !important; margin: 0 !important; letter-spacing: 0.5px; }
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(1) { background-color: #5c358f; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(2) { background-color: #c13945; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(3) { background-color: #2b7a78; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:nth-child(4) { background-color: #e68128; } 
+    [data-testid="stSidebar"] label[data-baseweb="radio"]:hover { transform: scale(1.02); filter: brightness(1.1); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -175,7 +177,6 @@ T_SUPER = db['settings']['terms']['super']
 T_ADMIN = db['settings']['terms']['admin']
 T_USER = db['settings']['terms']['user']
 T_PARENT = db['settings']['terms']['parent']
-
 UI = db['settings']['ui']
 
 menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4']]
@@ -236,7 +237,6 @@ if st.session_state.menu_option == UI['menu1']:
                         label = get_date_label(t)
                         date_val = label if label else "일정 미정"
                         
-                        # ✨ [세부 일정 줄바꿈 완벽 수정] 쉼표 대신 <br> 태그와 띄어쓰기로 깔끔하게 정렬
                         sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
                         if sub_texts:
                             subs_html = "<br>".join([f"&nbsp;&nbsp;└ {desc}" for desc in sub_texts])
@@ -385,7 +385,6 @@ elif st.session_state.menu_option == UI['menu2']:
                     
                     df_summ = pd.DataFrame(summary_rows)
                     
-                    # ✨ [학생 차트] SVG 포맷 및 아담한 사이즈(6x4) 적용
                     if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
                             st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
@@ -394,7 +393,7 @@ elif st.session_state.menu_option == UI['menu2']:
                             ax_s1.set_ylim(0, 100); ax_s1.tick_params(axis='x', rotation=15)
                             sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
                             ax_s2.set_ylim(0, 100); ax_s2.tick_params(axis='x', rotation=15)
-                            st.pyplot(fig_s1, format="svg", use_container_width=True)
+                            st.pyplot(fig_s1, use_container_width=True)
                             plt.close(fig_s1)
                             
                             if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0:
@@ -417,7 +416,7 @@ elif st.session_state.menu_option == UI['menu2']:
                                 fig_d, ax_d = plt.subplots(figsize=(6, 4))
                                 ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                                 ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                                st.pyplot(fig_d, format="svg", use_container_width=True)
+                                st.pyplot(fig_d, use_container_width=True)
                                 plt.close(fig_d)
                                 
                                 bad_att = att_counts['지각'] + att_counts['결석']
@@ -436,7 +435,7 @@ elif st.session_state.menu_option == UI['menu2']:
                                 fig_l, ax_l = plt.subplots(figsize=(8, 4))
                                 sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                                 ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_l, format="svg", use_container_width=True)
+                                st.pyplot(fig_l, use_container_width=True)
                                 plt.close(fig_l)
                                 
                                 first_score = df_trend['점수'].iloc[0]
@@ -574,7 +573,6 @@ elif st.session_state.menu_option == UI['menu3']:
                             st.write("")
                             df_p_summ = pd.DataFrame(p_summary_rows)
                             
-                            # ✨ [학부모 차트] SVG 포맷 및 반응형 사이즈 적용
                             if "막대 그래프 (자녀별 성취도/진행률) [추천]" in selected_p_charts and not df_p_summ.empty:
                                 p_col1, p_col2 = st.columns(2)
                                 with p_col1:
@@ -583,7 +581,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_p1, ax_p1 = plt.subplots(figsize=(6, 4))
                                         sns.barplot(data=df_p_summ, x='라벨', y='진행률(%)', ax=ax_p1, palette='mako')
                                         ax_p1.set_ylim(0, 100); ax_p1.tick_params(axis='x', rotation=15)
-                                        st.pyplot(fig_p1, format="svg", use_container_width=True)
+                                        st.pyplot(fig_p1, use_container_width=True)
                                         plt.close(fig_p1)
                                         
                                         if df_p_summ['진행률(%)'].max() == 0:
@@ -598,7 +596,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_p2, ax_p2 = plt.subplots(figsize=(6, 4))
                                         sns.barplot(data=df_p_summ, x='라벨', y='평균 성취도', ax=ax_p2, palette='flare')
                                         ax_p2.set_ylim(0, 100); ax_p2.tick_params(axis='x', rotation=15)
-                                        st.pyplot(fig_p2, format="svg", use_container_width=True)
+                                        st.pyplot(fig_p2, use_container_width=True)
                                         plt.close(fig_p2)
                                         
                                         if df_p_summ['평균 성취도'].max() == 0:
@@ -624,7 +622,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_dp, ax_dp = plt.subplots(figsize=(6, 4))
                                         ax_dp.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                                         ax_dp.text(0, 0, f"총 {total_att_p}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                                        st.pyplot(fig_dp, format="svg", use_container_width=True)
+                                        st.pyplot(fig_dp, use_container_width=True)
                                         plt.close(fig_dp)
                                         
                                         bad_att_p = att_counts_total['지각'] + att_counts_total['결석']
@@ -643,7 +641,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                         fig_lp, ax_lp = plt.subplots(figsize=(8, 4))
                                         sns.lineplot(data=df_trend_p, x='날짜', y='점수', hue='자녀명', marker='o', ax=ax_lp)
                                         ax_lp.set_ylim(0, 105); ax_lp.tick_params(axis='x', rotation=45)
-                                        st.pyplot(fig_lp, format="svg", use_container_width=True)
+                                        st.pyplot(fig_lp, use_container_width=True)
                                         plt.close(fig_lp)
                                         st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 자녀들의 시간 흐름에 따른 성취도 변화를 직관적으로 비교할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -812,14 +810,13 @@ elif st.session_state.menu_option == UI['menu4']:
                 df_dash = pd.DataFrame(dashboard_data)
                 df_tasks = pd.DataFrame(task_data)
 
-                # ✨ [관리자 차트] SVG 포맷 및 아담한 사이즈 적용
                 if "막대 그래프 (프로그램별 평균 성취도) [추천]" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
                         fig1, ax1 = plt.subplots(figsize=(8, 4))
                         sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
                         ax1.set_ylim(0, 100); ax1.tick_params(axis='x', rotation=15)
-                        st.pyplot(fig1, format="svg", use_container_width=True)
+                        st.pyplot(fig1, use_container_width=True)
                         plt.close(fig1)
 
                         valid_scores = df_dash[df_dash['AvgScore'] > 0]
@@ -847,7 +844,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_d, ax_d = plt.subplots(figsize=(6, 4))
                             ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, pctdistance=0.85, wedgeprops=dict(width=0.4, edgecolor='w'))
                             ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontsize=12, fontweight='bold')
-                            st.pyplot(fig_d, format="svg", use_container_width=True)
+                            st.pyplot(fig_d, use_container_width=True)
                             plt.close(fig_d)
                             
                             bad_ratio = ((att_counts_total['지각'] + att_counts_total['결석']) / total_att) * 100
@@ -866,7 +863,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_l, ax_l = plt.subplots(figsize=(10, 4))
                             sns.lineplot(data=df_t, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                             ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                            st.pyplot(fig_l, format="svg", use_container_width=True)
+                            st.pyplot(fig_l, use_container_width=True)
                             plt.close(fig_l)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 선이 우상향하면 성취도가 개선되는 추세이며, 우하향할 경우 학습 난이도 조절이 필요할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -884,7 +881,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             fig_h, ax_h = plt.subplots(figsize=(10, max(3, len(pivot_h)*0.5)))
                             sns.heatmap(pivot_h, cmap='RdYlGn', cbar=False, linewidths=.5, ax=ax_h)
                             ax_h.set_title("초록색: 출석, 노란색: 지각, 빨간색: 결석", fontsize=10, color='gray')
-                            st.pyplot(fig_h, format="svg", use_container_width=True)
+                            st.pyplot(fig_h, use_container_width=True)
                             plt.close(fig_h)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 붉은색이 연속해서 나타나는 행(특정 학생)이나 열(특정 요일)을 찾아 개별 면담이나 스케줄 보완을 진행하세요.</div></div>", unsafe_allow_html=True)
 
@@ -895,7 +892,7 @@ elif st.session_state.menu_option == UI['menu4']:
                         sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax_s, palette='Set1', alpha=0.8)
                         ax_s.set_xlabel('Number of Comments Given')
                         ax_s.set_ylabel('Average Score')
-                        st.pyplot(fig_s, format="svg", use_container_width=True)
+                        st.pyplot(fig_s, use_container_width=True)
                         plt.close(fig_s)
 
                         valid_sc = df_dash[df_dash['AvgScore'] > 0]
@@ -933,7 +930,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             ax_st.set_ylabel('Days Count')
                             plt.xticks(rotation=15, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
-                            st.pyplot(fig_st, format="svg", use_container_width=True)
+                            st.pyplot(fig_st, use_container_width=True)
                             plt.close(fig_st)
                             st.markdown("<div class='report-box'><div class='info-text'>ℹ️ 각 막대의 전체 길이는 총 수업일수를 나타내며, 내부 색상 비율을 통해 결석이 유독 많은 프로그램을 쉽게 색출할 수 있습니다.</div></div>", unsafe_allow_html=True)
 
@@ -1132,7 +1129,7 @@ elif st.session_state.menu_option == UI['menu4']:
                             ax_att.set_xlabel('')
                             plt.xticks(rotation=15, ha='right')
                             plt.legend(title='상태', bbox_to_anchor=(1.05, 1), loc='upper left')
-                            st.pyplot(fig_att, format="svg", use_container_width=True)
+                            st.pyplot(fig_att, use_container_width=True)
                             plt.close(fig_att)
                             
                             st.divider()
