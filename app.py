@@ -112,6 +112,24 @@ def get_date_label(task_dict):
 
 def safe_key(text): return re.sub(r'[\.\$#\[\]/]', '_', text)
 
+# ✨ [핵심 추가] 특정 사용자의 '역할(Role)' 유효 기간(Min~Max) 안에 해당 날짜가 포함되는지 검사하는 함수
+def is_active_role_period(u_dict, target_date_str):
+    u_dates = []
+    for t in u_dict.get('workflow', []):
+        sd, ed = get_date_range(t)
+        for d_str in [sd, ed]:
+            if d_str and re.match(r'\d{4}-\d{2}-\d{2}', d_str):
+                try: u_dates.append(datetime.strptime(d_str.strip(), "%Y-%m-%d").date())
+                except: pass
+    
+    if not u_dates: return True # 날짜가 아예 지정되지 않은 역할은 항상 표시(예외 방어)
+    
+    try:
+        target_d_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        return min(u_dates) <= target_d_obj <= max(u_dates)
+    except:
+        return False
+
 # ==============================================================
 # ✨ [데이터베이스 연결 로직]
 # ==============================================================
@@ -332,10 +350,12 @@ elif st.session_state.menu_option == UI['menu2']:
                         pct = int((d_items/t_items)*100) if t_items > 0 else 0
                         avg_s = sum(s_list)/len(s_list) if s_list else 0
                         
-                        for att_info in d.get('attendance', {}).values():
-                            st_val = att_info.get('status')
-                            if st_val in att_counts:
-                                att_counts[st_val] += 1
+                        # ✨ 학생용: 출석 통계 계산 시 역할별 기간 조건 적용
+                        for d_key, att_info in d.get('attendance', {}).items():
+                            if is_active_role_period(d, d_key):
+                                st_val = att_info.get('status')
+                                if st_val in att_counts:
+                                    att_counts[st_val] += 1
                                 
                         total_t_all += t_items
                         total_d_all += d_items
@@ -502,11 +522,13 @@ elif st.session_state.menu_option == UI['menu3']:
                             avg_s = sum(s_list)/len(s_list) if s_list else 0
                             
                             s_att = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}
-                            for att_info in s_record.get('attendance', {}).values():
-                                st_val = att_info.get('status')
-                                if st_val in s_att:
-                                    s_att[st_val] += 1
-                                    att_counts_total[st_val] += 1
+                            # ✨ 학부모용: 출석 통계 계산 시 역할별 기간 조건 적용
+                            for d_key, att_info in s_record.get('attendance', {}).items():
+                                if is_active_role_period(s_record, d_key):
+                                    st_val = att_info.get('status')
+                                    if st_val in s_att:
+                                        s_att[st_val] += 1
+                                        att_counts_total[st_val] += 1
                                     
                             p_summary_rows.append({
                                 "자녀명": s_record['name'],
@@ -721,7 +743,13 @@ elif st.session_state.menu_option == UI['menu4']:
                 for u in users_to_show:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     avg_score = sum(t_scores) / len(t_scores) if t_scores else 0
-                    att_counts = sum(1 for v in u.get('attendance', {}).values() if v.get('status') == '출석')
+                    
+                    # ✨ 관리자 대시보드: 출결 점검 시 해당 학생의 역할 기간만 체크하도록 수정
+                    att_counts = 0
+                    for d_key, v in u.get('attendance', {}).items():
+                        if is_active_role_period(u, d_key) and v.get('status') == '출석':
+                            att_counts += 1
+                            
                     comment_counts = sum(1 for t in u['workflow'] if t.get('comment'))
                     
                     dashboard_data.append({
@@ -872,7 +900,13 @@ elif st.session_state.menu_option == UI['menu4']:
                 for u in users_to_show:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
-                    att_counts = sum(1 for v in u.get('attendance', {}).values() if v.get('status') == '출석')
+                    
+                    # ✨ 관리자 명단: 출결 점검 시 해당 학생의 역할 기간만 체크하도록 수정
+                    att_counts = 0
+                    for d_key, v in u.get('attendance', {}).items():
+                        if is_active_role_period(u, d_key) and v.get('status') == '출석':
+                            att_counts += 1
+                            
                     overview_data.append({
                         f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
                         "평균성취도(점)": pct, "총 출석(일)": att_counts
@@ -946,31 +980,16 @@ elif st.session_state.menu_option == UI['menu4']:
                         att_date_obj = st.date_input("🗓️ 출석을 기록할 날짜 선택 (프로그램 기간만 선택 가능)", **date_kwargs)
                         att_date = att_date_obj.strftime("%Y-%m-%d")
                         
-                        # ✨ [핵심 기능] 선택한 날짜에 해당하는 역할(Role)만 필터링하는 로직
+                        # ✨ [핵심 기능 적용] 선택된 날짜에 스케줄이 유효한 역할(학생)만 추출
                         active_pu = []
                         for idx, u in pu:
-                            u_dates = []
-                            for t in u.get('workflow', []):
-                                sd, ed = get_date_range(t)
-                                for d_str in [sd, ed]:
-                                    if d_str and re.match(r'\d{4}-\d{2}-\d{2}', d_str):
-                                        try: u_dates.append(datetime.strptime(d_str, "%Y-%m-%d").date())
-                                        except: pass
-                            
-                            is_active = True
-                            if u_dates:
-                                u_min_d, u_max_d = min(u_dates), max(u_dates)
-                                if not (u_min_d <= att_date_obj <= u_max_d):
-                                    is_active = False
-                            
-                            if is_active:
+                            if is_active_role_period(u, att_date):
                                 active_pu.append((idx, u))
 
                         if not active_pu:
-                            st.info(f"💡 선택하신 **{att_date}**에 일정이 진행되는 {T_USER}(역할)이 없습니다. 날짜를 다시 확인해 주세요.")
+                            st.info(f"💡 선택하신 **{att_date}**에 일정이 할당된 역할({T_USER})이 없습니다. 다른 날짜를 선택해 주세요.")
                         else:
-                            st.info(f"💡 선택하신 **{att_date}**의 출석을 입력합니다. 해당 날짜에 일정이 있는 역할만 표시됩니다.")
-                            
+                            st.info(f"💡 선택하신 **{att_date}**에 일정이 있는 {T_USER}만 표시됩니다.")
                             with st.form(f"att_form"):
                                 att_up = {}
                                 h1, h2, h3 = st.columns([3, 3, 4])
@@ -1002,16 +1021,18 @@ elif st.session_state.menu_option == UI['menu4']:
                         for i, u in pu:
                             disp_name = u.get('alias') or u['name']
                             for d_key, info in u.get('attendance', {}).items():
-                                att_records.append({
-                                    f"{T_USER}명": f"{disp_name}({u['role']})",
-                                    "날짜": d_key,
-                                    "상태": info['status'],
-                                    "비고": info['note']
-                                })
+                                # ✨ [핵심 기능 적용] 해당 역할의 유효 기간 내에 있는 데이터만 시각화에 반영
+                                if is_active_role_period(u, d_key):
+                                    att_records.append({
+                                        f"{T_USER}명": f"{disp_name}({u['role']})",
+                                        "날짜": d_key,
+                                        "상태": info['status'],
+                                        "비고": info['note']
+                                    })
                         
                         if att_records:
                             df_att = pd.DataFrame(att_records)
-                            st.write(f"##### 📅 {T_USER}별 일자별 출석 상세")
+                            st.write(f"##### 📅 {T_USER}별 일자별 출석 상세 (유효 기간 한정)")
                             pivot_df = df_att.pivot(index=f"{T_USER}명", columns='날짜', values='상태').fillna('-')
                             pivot_df = pivot_df.reindex(sorted(pivot_df.columns), axis=1) 
                             st.dataframe(pivot_df, use_container_width=True)
