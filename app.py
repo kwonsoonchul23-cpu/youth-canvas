@@ -284,7 +284,6 @@ if st.session_state.menu_option == UI['menu1']:
                 st.markdown(f"<div class='recruit-period'>🗓️ 모집 기간: {p_r_start} ~ {p_r_end}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='card-desc'>{prog['desc']}</div>", unsafe_allow_html=True)
                 
-                # 미디어 뷰어
                 m_type = prog.get('media_type', 'url')
                 m_url = prog.get('media_url', prog.get('video', ''))
                 
@@ -332,7 +331,7 @@ if st.session_state.menu_option == UI['menu1']:
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu3'])
 
 # =========================================================
-# [페이지 2] ✨ 전체 일정 (달력)
+# [페이지 2] ✨ 전체 일정 (독립된 달력 탭 및 다이렉트 수강신청)
 # =========================================================
 elif st.session_state.menu_option == UI['menu2']:
     st.markdown(f"## {UI['page2_title']}")
@@ -410,7 +409,7 @@ elif st.session_state.menu_option == UI['menu2']:
     st.markdown(html_cal, unsafe_allow_html=True)
 
 # =========================================================
-# [페이지 3] 나의 이야기 (학생)
+# [페이지 3] 나의 이야기 (학생 화면)
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['page3_title']}")
@@ -424,49 +423,62 @@ elif st.session_state.menu_option == UI['menu3']:
             if not active_programs: st.error("⏳ 현재 모집 중인 프로그램이 없습니다.")
             else:
                 default_idx = active_programs.index(st.session_state['selected_prog_from_main']) if 'selected_prog_from_main' in st.session_state and st.session_state['selected_prog_from_main'] in active_programs else 0
+                
                 with st.container(border=True):
-                    colA, colB = st.columns(2)
-                    user_name = colA.text_input(f"{T_USER} 이름 (실명 입력)")
-                    user_pin = colB.text_input("나만의 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
-                    selected_prog_title = st.selectbox("참여할 프로그램", active_programs, index=default_idx)
+                    # ✨ [핵심 픽스] 프로그램 선택을 Form 밖으로 빼서 동적 업데이트 지원
+                    selected_prog_title = st.selectbox("🎯 참여할 프로그램 선택 (먼저 선택해주세요)", active_programs, index=default_idx)
                     selected_prog_data = next(p for p in db['programs'] if p['title'] == selected_prog_title)
                     
-                    role_options = []
-                    for r, cap in selected_prog_data.get('roles_capacity', {}).items():
-                        curr = sum(1 for u in db['users'] if u['program'] == selected_prog_title and u['role'] == r)
-                        role_options.append(f"{r} ({curr}/{cap}명) - {'지원가능' if curr < cap else '마감'}")
-                    selected_role_strs = st.multiselect("희망 역할 (여러 개 동시 선택 가능)", role_options)
-                    
-                    if st.button("✨ 최종 지원하기", use_container_width=True, type="primary"):
-                        if not user_name or not user_pin: st.error("이름과 비밀번호를 모두 입력하세요.")
-                        elif not selected_role_strs: st.error("희망 역할을 하나 이상 선택해주세요.")
-                        elif any("마감" in r for r in selected_role_strs): st.error("마감된 역할이 포함되어 있습니다.")
-                        else:
-                            added_count = 0
-                            for r_str in selected_role_strs:
-                                actual_role = r_str.split(" (")[0]
-                                my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
-                                for t in my_tasks: t['score'] = 0; t['comment'] = ""
-                                db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "parent_messages": [], "alias": "", "attendance": {}})
-                                added_count += 1
-                            if save_data(db): st.success("🎉 지원 완료!"); time.sleep(1); st.rerun()
+                    # ✨ [핵심 픽스] 입력창을 Form으로 감싸서 Tab 키 튕김(새로고침) 완벽 방지
+                    with st.form("apply_student_form", clear_on_submit=True):
+                        st.markdown("##### 📝 신규 지원서 작성")
+                        colA, colB = st.columns(2)
+                        user_name = colA.text_input(f"👤 {T_USER} 이름 (실명 입력)")
+                        user_pin = colB.text_input("🔑 나만의 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
+                        
+                        role_options = []
+                        for r, cap in selected_prog_data.get('roles_capacity', {}).items():
+                            curr = sum(1 for u in db['users'] if u['program'] == selected_prog_title and u['role'] == r)
+                            role_options.append(f"{r} ({curr}/{cap}명) - {'지원가능' if curr < cap else '마감'}")
+                        selected_role_strs = st.multiselect("🎭 희망 역할 (여러 개 동시 선택 가능)", role_options)
+                        
+                        if st.form_submit_button("✨ 최종 지원하기", use_container_width=True, type="primary"):
+                            if not user_name or not user_pin: st.error("이름과 비밀번호를 모두 입력하세요.")
+                            elif not selected_role_strs: st.error("희망 역할을 하나 이상 선택해주세요.")
+                            elif any("마감" in r for r in selected_role_strs): st.error("마감된 역할이 포함되어 있습니다.")
                             else:
-                                for _ in range(added_count): db['users'].pop()
+                                added_count = 0
+                                for r_str in selected_role_strs:
+                                    actual_role = r_str.split(" (")[0]
+                                    my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
+                                    for t in my_tasks: t['score'] = 0; t['comment'] = ""
+                                    db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "parent_messages": [], "alias": "", "attendance": {}})
+                                    added_count += 1
+                                if save_data(db): 
+                                    st.success("🎉 지원 완료! [나의 목표 및 진행도] 탭에서 로그인해보세요.")
+                                    time.sleep(1); st.rerun()
+                                else:
+                                    for _ in range(added_count): db['users'].pop()
 
     with tab2:
         with st.container(border=True):
-            col_id, col_pw, col_btn = st.columns([4, 4, 2])
-            search_name = col_id.text_input(f"{T_USER} 이름", placeholder="예: 권해리")
-            search_pin = col_pw.text_input("비밀번호 (4자리)", type="password")
-            login_attempt = col_btn.button("접속하기", use_container_width=True)
+            # ✨ [핵심 픽스] 학생 로그인창 Form 적용 (Tab 튕김 방지)
+            with st.form("student_login_form"):
+                col_id, col_pw, col_btn = st.columns([4, 4, 2])
+                search_name = col_id.text_input(f"{T_USER} 이름", placeholder="예: 권해리")
+                search_pin = col_pw.text_input("비밀번호 (4자리)", type="password")
+                login_attempt = col_btn.form_submit_button("접속하기", use_container_width=True)
             
-            if login_attempt or (search_name and search_pin):
+            if search_name and search_pin:
                 my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
-                if my_data:
+                if not my_data and login_attempt:
+                    st.error("정보가 일치하지 않습니다.")
+                elif my_data:
                     st.divider()
                     st.markdown(f"### 🌟 **{search_name}**님의 맞춤형 대시보드")
+                    st.info("💡 차트의 항목을 클릭하면 데이터를 켜고 끌 수 있으며, 마우스를 올리면 상세 수치가 보입니다.")
                     
-                    s_chart_options = ["막대 그래프 (프로그램별 성취도)", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
+                    s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
                     
                     summary_rows = []; total_t_all = 0; total_d_all = 0; all_scores = []; att_counts = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}; trend_data = []
@@ -494,9 +506,9 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     df_summ = pd.DataFrame(summary_rows)
                     
-                    if "막대 그래프 (프로그램별 성취도)" in selected_s_charts and not df_summ.empty:
+                    if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
-                            st.markdown("##### 📊 프로그램별 달성률 및 성취도")
+                            st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
                             c1, c2 = st.columns(2)
                             fig_s1 = px.bar(df_summ, x='프로그램', y='진행률(%)', color='프로그램', text='진행률(%)', title='활동 진행률')
                             fig_s1.update_traces(textposition='outside'); fig_s1.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
@@ -507,19 +519,24 @@ elif st.session_state.menu_option == UI['menu3']:
                             c2.plotly_chart(fig_s2, use_container_width=True)
 
                             if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다. 활동을 시작해보세요!")
-                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다!</div></div>", unsafe_allow_html=True)
+                            else:
+                                top_prog = df_summ.loc[df_summ['진행률(%)'].idxmax()]
+                                st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_prog['프로그램']}'의 달성률이 {top_prog['진행률(%)']}%로 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 🍩 나의 종합 출결 비율")
+                            st.markdown("##### 🍩 나의 종합 출결 비율 (도넛 차트)")
                             total_att = sum(att_counts.values())
                             if total_att == 0: st.info("📉 기록된 출결 데이터가 없습니다.")
                             else:
                                 labels = [k for k, v in att_counts.items() if v > 0]
                                 sizes = [v for v in att_counts.values() if v > 0]
-                                fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"총 {total_att}일 출결 기록")
-                                fig_d.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
-                                st.plotly_chart(fig_d, use_container_width=True)
+                                colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
+                                fig_d, ax_d = plt.subplots(figsize=(6, 4))
+                                ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
+                                ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontweight='bold')
+                                st.pyplot(fig_d, use_container_width=True)
+                                plt.close(fig_d)
                                 
                                 bad_att = att_counts['지각'] + att_counts['결석']
                                 if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 지각과 결석이 단 한 번도 없습니다! 완벽한 출석률입니다.</div></div>", unsafe_allow_html=True)
@@ -527,13 +544,15 @@ elif st.session_state.menu_option == UI['menu3']:
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
-                            if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
+                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
+                            if len(trend_data) < 2: st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True, hover_data={"점수": True, "날짜": True})
-                                fig_l.update_yaxes(range=[0, 105])
-                                st.plotly_chart(fig_l, use_container_width=True)
+                                fig_l, ax_l = plt.subplots(figsize=(8, 4))
+                                sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
+                                ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
+                                st.pyplot(fig_l, use_container_width=True)
+                                plt.close(fig_l)
 
                     st.divider()
                     st.markdown("### 🔍 개별 프로그램 세부 리포트")
@@ -574,7 +593,6 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if c2.form_submit_button("전송") and msg_input:
                                     data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
                                     if save_data(db): st.rerun()
-                elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
 # [페이지 4] 학부모 전용 라운지
@@ -584,15 +602,18 @@ elif st.session_state.menu_option == UI['menu4']:
     st.caption(f"발급받으신 개별 {T_PARENT} 계정으로 로그인하여 자녀의 성장 기록과 커리큘럼을 확인하세요.")
     
     with st.container(border=True):
-        col_id, col_pw, col_btn = st.columns([4, 4, 2])
-        parent_name = col_id.text_input(f"{T_PARENT} 성함", placeholder="예: 권해리 어머니")
-        parent_pin = col_pw.text_input(f"{T_PARENT} 전용 비밀번호 (4자리)", type="password")
-        login_attempt = col_btn.button("로그인", use_container_width=True)
+        # ✨ [핵심 픽스] 학부모 로그인창 Form 적용 (Tab 튕김 방지)
+        with st.form("parent_login_form"):
+            col_id, col_pw, col_btn = st.columns([4, 4, 2])
+            parent_name = col_id.text_input(f"{T_PARENT} 성함", placeholder="예: 권해리 어머니")
+            parent_pin = col_pw.text_input(f"{T_PARENT} 전용 비밀번호 (4자리)", type="password")
+            login_attempt = col_btn.form_submit_button("로그인", use_container_width=True)
         
-        if login_attempt or (parent_name and parent_pin):
+        if parent_name and parent_pin:
             my_parent_data = [p for p in db['parents'] if p['name'] == parent_name and p['pin'] == parent_pin]
-            
-            if my_parent_data:
+            if not my_parent_data and login_attempt:
+                st.error("정보가 일치하지 않습니다.")
+            elif my_parent_data:
                 p_info = my_parent_data[0]
                 st.success(f"환영합니다, **{p_info['name']}**님! 😊")
                 linked_students = p_info.get('linked_students', [])
@@ -781,7 +802,6 @@ elif st.session_state.menu_option == UI['menu5']:
                 
                 df_dash = pd.DataFrame(dashboard_data); df_tasks = pd.DataFrame(task_data)
 
-                # ✨ Plotly 관리자 차트
                 if "막대 그래프 (프로그램별 평균 성취도)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
@@ -797,6 +817,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         if total_att > 0:
                             labels = [k for k, v in att_counts_total.items() if v > 0]
                             sizes = [v for v in att_counts_total.values() if v > 0]
+                            colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                             fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title="통합 출석 현황")
                             fig_d.update_traces(textposition='inside', textinfo='percent+label')
                             st.plotly_chart(fig_d, use_container_width=True)
@@ -817,7 +838,9 @@ elif st.session_state.menu_option == UI['menu5']:
                         val_map = {'출석': 1, '지각': 0.5, '병결': -0.5, '결석': -1}
                         df_h['NumericStatus'] = df_h['상태'].map(val_map)
                         pivot_h = df_h.pivot_table(index='학생명', columns='날짜', values='NumericStatus', fill_value=0)
-                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
+                        
+                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), 
+                                          x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
                         st.plotly_chart(fig_h, use_container_width=True)
 
                 if "산점도 (피드백 효과)" in selected_charts and not df_dash.empty:
@@ -889,7 +912,6 @@ elif st.session_state.menu_option == UI['menu5']:
                             df_p = pd.DataFrame(db['payments'])
                             st.metric("💰 누적 총 매출 금액", f"{df_p['amount'].sum():,} 원")
                             
-                            # ✨ 재무 파트 Plotly 차트 전환
                             f_col1, f_col2 = st.columns(2)
                             with f_col1:
                                 with st.container(border=True):
@@ -954,7 +976,8 @@ elif st.session_state.menu_option == UI['menu5']:
                             elif cr and ':' in line and not line.startswith('-'):
                                 match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
                                 if match:
-                                    dt_part = match.group(1).strip(); tk_part = match.group(2).strip()
+                                    dt_part = match.group(1).strip()
+                                    tk_part = match.group(2).strip()
                                 else:
                                     dt_part, tk_part = line.split(':', 1) if ':' in line else (line, "")
 
@@ -1101,8 +1124,16 @@ elif st.session_state.menu_option == UI['menu5']:
                 for u in users_to_show:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
-                    att_counts = sum(1 for d_key, v in u.get('attendance', {}).items() if is_active_role_period(u, d_key) and v.get('status') == '출석')
-                    overview_data.append({f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], "평균성취도(점)": pct, "총 출석(일)": att_counts})
+                    
+                    att_counts = 0
+                    for d_key, v in u.get('attendance', {}).items():
+                        if is_active_role_period(u, d_key) and v.get('status') == '출석':
+                            att_counts += 1
+                            
+                    overview_data.append({
+                        f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
+                        "평균성취도(점)": pct, "총 출석(일)": att_counts
+                    })
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
