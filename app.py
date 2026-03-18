@@ -9,39 +9,13 @@ import copy
 import time
 import urllib.request
 import urllib.parse
-import io
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
-import matplotlib.pyplot as plt 
-import seaborn as sns 
-import matplotlib.font_manager as fm
+import plotly.express as px  # ✨ 완벽한 상호작용을 위한 Plotly 라이브러리 도입!
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
-
-# --- ✨ 시각화 폰트 설정 및 초고해상도(DPI) 세팅 ---
-@st.cache_resource
-def set_korean_font():
-    font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-    font_path = "NanumGothic.ttf"
-    try:
-        if not os.path.exists(font_path):
-            urllib.request.urlretrieve(font_url, font_path)
-        fm.fontManager.addfont(font_path)
-        font_prop = fm.FontProperties(fname=font_path)
-        font_name = font_prop.get_name()
-        plt.rc('font', family=font_name)
-    except:
-        import platform
-        if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
-        elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
-    
-    plt.rcParams['axes.unicode_minus'] = False
-    plt.rcParams['figure.dpi'] = 300  
-    sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
-
-set_korean_font()
 
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
@@ -59,7 +33,6 @@ st.markdown("""
     .card-desc { font-size: 0.95em; color: #64748b; margin-bottom: 1em; }
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
     
-    /* ✨ 표(Table) 가독성 향상 디자인 */
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.95em; text-align: left; margin-bottom: 10px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .schedule-table th { border-bottom: 2px solid #cbd5e1; padding: 12px; background-color: #f8fafc; font-weight: 800; color: #334155; }
     .schedule-table td { border-bottom: 1px solid #e2e8f0; padding: 12px; color: #1e293b; vertical-align: top; }
@@ -101,6 +74,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- 공통 출결 컬러맵 ---
+ATT_COLORS = {'출석': '#2ECC71', '지각': '#FFC107', '결석': '#E74C3C', '병결': '#9B59B6'}
+
 # --- 유틸리티 함수 ---
 def fix_youtube_url(url):
     if not url: return None
@@ -117,17 +93,13 @@ def get_date_range(task_dict):
         return d.strip(), d.strip()
     return "", ""
 
-# ✨ [신규 추가] 시간까지 포함하여 예쁘게 라벨을 반환하는 함수
 def get_date_label(task_dict):
     sd, ed = get_date_range(task_dict)
     time_str = task_dict.get('time', '')
     label = ""
     if sd and ed and sd != ed: label = f"[{sd} ~ {ed}]"
     elif sd and sd != "-": label = f"[{sd}]"
-    
-    if time_str:
-        label += f" ⏱️{time_str}"
-        
+    if time_str: label += f" ⏱️{time_str}"
     return label + " " if label else ""
 
 def safe_key(text): 
@@ -149,7 +121,6 @@ def is_active_role_period(u_dict, target_date_str):
         ed_date = extract_date(ed)
         if sd_date: u_dates.append(sd_date)
         if ed_date: u_dates.append(ed_date)
-        
     if not u_dates: return True 
     try:
         target_d_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
@@ -224,9 +195,6 @@ T_PARENT = db['settings']['terms']['parent']
 UI = db['settings']['ui']
 menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4'], UI['menu5']]
 
-# ==============================================================
-# ✨ [라우팅 로직] URL 파라미터를 읽어 다이렉트 이동 세팅
-# ==============================================================
 try:
     if hasattr(st, 'query_params') and 'target_menu' in st.query_params:
         if st.query_params['target_menu'] == 'apply':
@@ -294,7 +262,6 @@ if st.session_state.menu_option == UI['menu1']:
                 tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
                 
-                # ✨ [핵심 픽스] Flat Table 형식의 가독성 좋은 '전체 일정 요약' 생성
                 flat_tasks = []
                 for role, tasks in prog.get('roles_workflow', {}).items():
                     for t in tasks:
@@ -307,17 +274,10 @@ if st.session_state.menu_option == UI['menu1']:
                         subs_html = "<br>".join([f"&nbsp;&nbsp;└ {desc}" for desc in sub_texts])
                         task_display = f"<b>{t['task']}</b><br><span style='color:#64748b; font-size:0.9em;'>{subs_html}</span>" if sub_texts else f"<b>{t['task']}</b>"
                         
-                        # 정렬을 위한 키 생성
                         sd_date = extract_date(sd)
                         sort_key = sd_date.strftime("%Y-%m-%d") if sd_date else "9999-12-31"
                         
-                        flat_tasks.append({
-                            "sort_key": sort_key,
-                            "date_label": date_label,
-                            "time": time_val,
-                            "role": role,
-                            "task": task_display
-                        })
+                        flat_tasks.append({"sort_key": sort_key, "date_label": date_label, "time": time_val, "role": role, "task": task_display})
                 
                 if flat_tasks:
                     flat_tasks.sort(key=lambda x: x['sort_key'])
@@ -336,7 +296,7 @@ if st.session_state.menu_option == UI['menu1']:
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu3'])
 
 # =========================================================
-# [페이지 2] ✨ 전체 일정 (독립된 달력 탭 및 다이렉트 수강신청)
+# [페이지 2] ✨ 전체 일정 (달력)
 # =========================================================
 elif st.session_state.menu_option == UI['menu2']:
     st.markdown(f"## {UI['page2_title']}")
@@ -386,12 +346,7 @@ elif st.session_state.menu_option == UI['menu2']:
                         d = date.fromordinal(d_ord)
                         if d.year == sel_year and d.month == sel_month:
                             disp_title = f"[{prog_title_short}] {t['task']}"
-                            day_events[d.day].append({
-                                "title": disp_title, 
-                                "color": prog_color,
-                                "tooltip": tooltip_text,
-                                "prog_name": prog_title_full
-                            })
+                            day_events[d.day].append({"title": disp_title, "color": prog_color, "tooltip": tooltip_text, "prog_name": prog_title_full})
 
     html_cal = "<table class='cal-table'><tr>"
     days = ["월", "화", "수", "목", "금", "토", "일"]
@@ -410,11 +365,10 @@ elif st.session_state.menu_option == UI['menu2']:
                 html_cal += f"<td class='cal-td'><div class='cal-day-num'>{day}</div>{events_html}</td>"
         html_cal += "</tr>"
     html_cal += "</table>"
-    
     st.markdown(html_cal, unsafe_allow_html=True)
 
 # =========================================================
-# [페이지 3] 나의 이야기 (학생 화면)
+# [페이지 3] 나의 이야기 (학생)
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['page3_title']}")
@@ -469,6 +423,7 @@ elif st.session_state.menu_option == UI['menu3']:
                 if my_data:
                     st.divider()
                     st.markdown(f"### 🌟 **{search_name}**님의 맞춤형 대시보드")
+                    st.info("💡 차트의 항목을 클릭하면 데이터를 켜고 끌 수 있으며, 마우스를 올리면 상세 수치가 보입니다.")
                     
                     s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
@@ -497,40 +452,47 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     df_summ = pd.DataFrame(summary_rows)
                     
+                    # ✨ Plotly 학생 차트
                     if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
-                            st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
-                            fig_s1, (ax_s1, ax_s2) = plt.subplots(1, 2, figsize=(10, 4))
-                            sns.barplot(data=df_summ, x='프로그램', y='진행률(%)', ax=ax_s1, palette='mako')
-                            ax_s1.set_ylim(0, 100); ax_s1.tick_params(axis='x', rotation=15)
-                            sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
-                            ax_s2.set_ylim(0, 100); ax_s2.tick_params(axis='x', rotation=15)
-                            st.pyplot(fig_s1, use_container_width=True); plt.close(fig_s1)
+                            st.markdown("##### 📊 프로그램별 달성률 및 성취도")
+                            c1, c2 = st.columns(2)
+                            fig_s1 = px.bar(df_summ, x='프로그램', y='진행률(%)', color='프로그램', text='진행률(%)', title='활동 진행률')
+                            fig_s1.update_traces(textposition='outside'); fig_s1.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
+                            c1.plotly_chart(fig_s1, use_container_width=True)
+                            
+                            fig_s2 = px.bar(df_summ, x='프로그램', y='평균 성취도', color='프로그램', text='평균 성취도', title='선생님 평가 성취도')
+                            fig_s2.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig_s2.update_layout(yaxis=dict(range=[0, 105]))
+                            c2.plotly_chart(fig_s2, use_container_width=True)
+
+                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다.")
+                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다!</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 🍩 나의 종합 출결 비율 (도넛 차트)")
+                            st.markdown("##### 🍩 나의 종합 출결 비율")
                             total_att = sum(att_counts.values())
                             if total_att == 0: st.info("📉 기록된 출결 데이터가 없습니다.")
                             else:
                                 labels = [k for k, v in att_counts.items() if v > 0]
                                 sizes = [v for v in att_counts.values() if v > 0]
-                                colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
-                                fig_d, ax_d = plt.subplots(figsize=(6, 4))
-                                ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
-                                ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontweight='bold')
-                                st.pyplot(fig_d, use_container_width=True); plt.close(fig_d)
+                                fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"총 {total_att}일 출결 기록")
+                                fig_d.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
+                                st.plotly_chart(fig_d, use_container_width=True)
+                                
+                                bad_att = att_counts['지각'] + att_counts['결석']
+                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 완벽한 출석률입니다!</div></div>", unsafe_allow_html=True)
+                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다.</div></div>", unsafe_allow_html=True)
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
+                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
                             if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l, ax_l = plt.subplots(figsize=(8, 4))
-                                sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
-                                ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_l, use_container_width=True); plt.close(fig_l)
+                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True, hover_data={"점수": True, "날짜": True})
+                                fig_l.update_yaxes(range=[0, 105])
+                                st.plotly_chart(fig_l, use_container_width=True)
 
                     st.divider()
                     st.markdown("### 🔍 개별 프로그램 세부 리포트")
@@ -542,7 +504,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 total_items += 1; done_items += 1 if t.get('done') else 0
                                 for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                             pct = int((done_items/total_items)*100) if total_items > 0 else 0
-                            st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                            st.metric("활동 달성률", f"{pct}%", f"{done_items} / {total_items} 완료")
                             st.progress(pct / 100)
 
                             st.write("#### ✅ 세부 활동 체크리스트")
@@ -559,7 +521,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if changed: 
                                     if save_data(db): st.rerun()
 
-                            st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
+                            st.write(f"#### 💬 1:1 비밀 소통 게시판 ({T_USER} 전용)")
                             chat_box = st.container(border=True, height=250)
                             with chat_box:
                                 if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -609,7 +571,7 @@ elif st.session_state.menu_option == UI['menu4']:
                                     s_list.append(t.get('score'))
                                     sd, _ = get_date_range(t)
                                     sd_date = extract_date(sd)
-                                    if sd_date: trend_data_p.append({"날짜": sd_date.strftime("%Y-%m-%d"), "자녀명": s_record['name'], "점수": t['score']})
+                                    if sd_date: trend_data_p.append({"날짜": sd_date.strftime("%Y-%m-%d"), "자녀명": s_record['name'], "점수": t['score'], "프로그램": s_record['program']})
                                 for stask in t.get('subtasks', []): t_items += 1; d_items += 1 if stask.get('done') else 0
                                     
                             pct = int((d_items/t_items)*100) if t_items > 0 else 0
@@ -636,36 +598,48 @@ elif st.session_state.menu_option == UI['menu4']:
                             selected_p_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요:", p_chart_options, default=p_chart_options)
                             df_p_summ = pd.DataFrame(p_summary_rows)
                             
+                            # ✨ Plotly 학부모 차트
                             if "막대 그래프 (자녀별 성취도/진행률) [추천]" in selected_p_charts and not df_p_summ.empty:
                                 p_col1, p_col2 = st.columns(2)
                                 with p_col1:
-                                    fig_p1, ax_p1 = plt.subplots(figsize=(6, 4))
-                                    sns.barplot(data=df_p_summ, x='라벨', y='진행률(%)', ax=ax_p1, palette='mako')
-                                    ax_p1.set_ylim(0, 100); ax_p1.tick_params(axis='x', rotation=15)
-                                    st.pyplot(fig_p1, use_container_width=True); plt.close(fig_p1)
+                                    with st.container(border=True):
+                                        st.markdown(f"##### 📊 자녀별 프로그램 진행률")
+                                        fig_p1 = px.bar(df_p_summ, x='라벨', y='진행률(%)', color='자녀명', text='진행률(%)')
+                                        fig_p1.update_traces(textposition='outside'); fig_p1.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
+                                        st.plotly_chart(fig_p1, use_container_width=True)
+                                        if df_p_summ['진행률(%)'].max() > 0: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: {df_p_summ.loc[df_p_summ['진행률(%)'].idxmax()]['자녀명']} {T_USER}의 활동이 가장 활발합니다.</div></div>", unsafe_allow_html=True)
+                                        
                                 with p_col2:
-                                    fig_p2, ax_p2 = plt.subplots(figsize=(6, 4))
-                                    sns.barplot(data=df_p_summ, x='라벨', y='평균 성취도', ax=ax_p2, palette='flare')
-                                    ax_p2.set_ylim(0, 100); ax_p2.tick_params(axis='x', rotation=15)
-                                    st.pyplot(fig_p2, use_container_width=True); plt.close(fig_p2)
+                                    with st.container(border=True):
+                                        st.markdown(f"##### 📊 자녀별 평균 성취도")
+                                        fig_p2 = px.bar(df_p_summ, x='라벨', y='평균 성취도', color='자녀명', text='평균 성취도')
+                                        fig_p2.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig_p2.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
+                                        st.plotly_chart(fig_p2, use_container_width=True)
+                                        if df_p_summ['평균 성취도'].max() > 0: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: {df_p_summ.loc[df_p_summ['평균 성취도'].idxmax()]['자녀명']} {T_USER}의 성취도가 뛰어납니다.</div></div>", unsafe_allow_html=True)
                             
                             if "도넛 차트 (자녀 통합 출결 비율)" in selected_p_charts:
-                                total_att_p = sum(att_counts_total.values())
-                                if total_att_p > 0:
-                                    labels = [k for k, v in att_counts_total.items() if v > 0]
-                                    sizes = [v for v in att_counts_total.values() if v > 0]
-                                    colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
-                                    fig_dp, ax_dp = plt.subplots(figsize=(6, 4))
-                                    ax_dp.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
-                                    ax_dp.text(0, 0, f"총 {total_att_p}일", ha='center', va='center', fontweight='bold')
-                                    st.pyplot(fig_dp, use_container_width=True); plt.close(fig_dp)
+                                with st.container(border=True):
+                                    st.markdown("##### 🍩 자녀 통합 종합 출결 비율")
+                                    total_att_p = sum(att_counts_total.values())
+                                    if total_att_p > 0:
+                                        labels = [k for k, v in att_counts_total.items() if v > 0]
+                                        sizes = [v for v in att_counts_total.values() if v > 0]
+                                        fig_dp = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"통합 출석일수: {total_att_p}일")
+                                        fig_dp.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
+                                        st.plotly_chart(fig_dp, use_container_width=True)
+                                        bad_att_p = att_counts_total['지각'] + att_counts_total['결석']
+                                        if bad_att_p == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 완벽한 출결 관리입니다.</div></div>", unsafe_allow_html=True)
+                                        else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석 누적 {bad_att_p}회 입니다.</div></div>", unsafe_allow_html=True)
                             
                             if "라인 그래프 (자녀별 성취도 추이)" in selected_p_charts and len(trend_data_p) >= 2:
-                                df_trend_p = pd.DataFrame(trend_data_p).sort_values(by="날짜")
-                                fig_lp, ax_lp = plt.subplots(figsize=(8, 4))
-                                sns.lineplot(data=df_trend_p, x='날짜', y='점수', hue='자녀명', marker='o', ax=ax_lp)
-                                ax_lp.set_ylim(0, 105); ax_lp.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_lp, use_container_width=True); plt.close(fig_lp)
+                                with st.container(border=True):
+                                    st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
+                                    df_trend_p = pd.DataFrame(trend_data_p).sort_values(by="날짜")
+                                    # 자녀명과 프로그램을 묶어서 범례 생성
+                                    df_trend_p['분류'] = df_trend_p['자녀명'] + " (" + df_trend_p['프로그램'] + ")"
+                                    fig_lp = px.line(df_trend_p, x='날짜', y='점수', color='분류', markers=True, hover_data={"점수": True, "날짜": True})
+                                    fig_lp.update_yaxes(range=[0, 105])
+                                    st.plotly_chart(fig_lp, use_container_width=True)
 
                     for idx, s_info in enumerate(linked_students):
                         with parent_tabs[idx + 1]:
@@ -729,7 +703,7 @@ elif st.session_state.menu_option == UI['menu5']:
             tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_settings = tabs
 
         # ---------------------------------------------------------
-        # 경영 대시보드
+        # 경영 대시보드 (Plotly 전면 교체)
         with tab_dashboard:
             dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
             st.subheader(f"📈 {dashboard_title} 맞춤형 데이터 대시보드")
@@ -738,6 +712,7 @@ elif st.session_state.menu_option == UI['menu5']:
             if not users_to_show: 
                 st.info(f"데이터가 부족하여 대시보드를 생성할 수 없습니다.")
             else:
+                st.info("💡 핫팁: 차트 우측 상단의 카메라(📷) 아이콘을 클릭하면 언제든 이미지를 다운로드할 수 있습니다.")
                 chart_options = ["막대 그래프 (프로그램별 평균 성취도)", "도넛 차트 (전체 출결 비율)", "라인 그래프 (성취도 추이)", "히트맵 (출결 밀도)", "산점도 (피드백 효과)", "스택 막대 그래프 (출결 상세)"]
                 selected_charts = st.multiselect("📊 화면에 띄울 차트를 선택하세요:", chart_options, default=["막대 그래프 (프로그램별 평균 성취도)", "산점도 (피드백 효과)"])
                 st.write("")
@@ -753,7 +728,7 @@ elif st.session_state.menu_option == UI['menu5']:
                             st_val = v.get('status')
                             if st_val == '출석': att_counts += 1
                             if st_val in att_counts_total: att_counts_total[st_val] += 1
-                            heat_data.append({"학생명": u['name'], "날짜": d_key, "상태": st_val})
+                            heat_data.append({"학생명": u['name'], "날짜": d_key, "상태": st_val, "프로그램": u['program']})
                             
                     comment_counts = sum(1 for t in u['workflow'] if t.get('comment'))
                     dashboard_data.append({"Program": u['program'], "Role": u['role'], "Student": u.get('alias') or u['name'], "AvgScore": avg_score, "Attendance": att_counts, "Comments": comment_counts})
@@ -767,67 +742,66 @@ elif st.session_state.menu_option == UI['menu5']:
                 
                 df_dash = pd.DataFrame(dashboard_data); df_tasks = pd.DataFrame(task_data)
 
+                # ✨ 관리자 Plotly 차트 연동
                 if "막대 그래프 (프로그램별 평균 성취도)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
-                        st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
-                        fig1, ax1 = plt.subplots(figsize=(8, 4))
-                        sns.barplot(data=df_dash, x='Program', y='AvgScore', ax=ax1, palette='Set2', errorbar=None)
-                        ax1.set_ylim(0, 100); ax1.tick_params(axis='x', rotation=15)
-                        st.pyplot(fig1, use_container_width=True); plt.close(fig1)
+                        st.markdown(f"##### 📊 프로그램별 평균 성취도 비교")
+                        # 프로그램별 평균 계산
+                        df_avg = df_dash.groupby('Program')['AvgScore'].mean().reset_index()
+                        fig1 = px.bar(df_avg, x='Program', y='AvgScore', color='Program', text='AvgScore', title="프로그램별 전체 평균 점수")
+                        fig1.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig1.update_layout(yaxis=dict(range=[0, 105]))
+                        st.plotly_chart(fig1, use_container_width=True)
 
                 if "도넛 차트 (전체 출결 비율)" in selected_charts:
                     with st.container(border=True):
-                        st.markdown(f"##### 🍩 도넛 차트: 시설 전체 {T_USER} 출결 비율")
+                        st.markdown(f"##### 🍩 시설 전체 {T_USER} 출결 비율")
                         total_att = sum(att_counts_total.values())
                         if total_att > 0:
                             labels = [k for k, v in att_counts_total.items() if v > 0]
                             sizes = [v for v in att_counts_total.values() if v > 0]
-                            colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
-                            fig_d, ax_d = plt.subplots(figsize=(6, 4))
-                            ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
-                            st.pyplot(fig_d, use_container_width=True); plt.close(fig_d)
+                            fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title="통합 출석 현황")
+                            fig_d.update_traces(textposition='inside', textinfo='percent+label')
+                            st.plotly_chart(fig_d, use_container_width=True)
 
                 if "라인 그래프 (성취도 추이)" in selected_charts and len(trend_data) >= 2:
                     with st.container(border=True):
-                        st.markdown(f"##### 📈 라인 그래프: 시간에 따른 프로그램 성과 변화")
+                        st.markdown(f"##### 📈 시간에 따른 프로그램 성과 변화")
                         df_t = pd.DataFrame(trend_data).sort_values(by="날짜")
-                        fig_l, ax_l = plt.subplots(figsize=(10, 4))
-                        sns.lineplot(data=df_t, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
-                        ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                        st.pyplot(fig_l, use_container_width=True); plt.close(fig_l)
+                        # 일자별 평균으로 단순화
+                        df_t_avg = df_t.groupby(['날짜', '프로그램'])['점수'].mean().reset_index()
+                        fig_l = px.line(df_t_avg, x='날짜', y='점수', color='프로그램', markers=True)
+                        fig_l.update_yaxes(range=[0, 105])
+                        st.plotly_chart(fig_l, use_container_width=True)
 
                 if "히트맵 (출결 밀도)" in selected_charts and heat_data:
                     with st.container(border=True):
-                        st.markdown(f"##### 🔲 히트맵: {T_USER}별 출결 패턴 밀도")
+                        st.markdown(f"##### 🔲 {T_USER}별 출결 패턴 밀도")
                         df_h = pd.DataFrame(heat_data)
-                        val_map = {'출석': 1, '지각': 0.5, '결석': -1, '병결': -0.5}
+                        val_map = {'출석': 1, '지각': 0.5, '병결': -0.5, '결석': -1}
                         df_h['NumericStatus'] = df_h['상태'].map(val_map)
                         pivot_h = df_h.pivot_table(index='학생명', columns='날짜', values='NumericStatus', fill_value=0)
-                        fig_h, ax_h = plt.subplots(figsize=(10, max(3, len(pivot_h)*0.5)))
-                        sns.heatmap(pivot_h, cmap='RdYlGn', cbar=False, linewidths=.5, ax=ax_h)
-                        st.pyplot(fig_h, use_container_width=True); plt.close(fig_h)
+                        
+                        # Plotly Heatmap
+                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), 
+                                          x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
+                        st.plotly_chart(fig_h, use_container_width=True)
 
                 if "산점도 (피드백 효과)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
-                        st.markdown(f"##### 🎯 산점도: {T_ADMIN} 피드백 빈도와 {T_USER} 성과 상관관계")
-                        fig_s, ax_s = plt.subplots(figsize=(8, 4))
-                        sns.scatterplot(data=df_dash, x='Comments', y='AvgScore', hue='Program', s=100, ax=ax_s, palette='Set1', alpha=0.8)
-                        st.pyplot(fig_s, use_container_width=True); plt.close(fig_s)
+                        st.markdown(f"##### 🎯 {T_ADMIN} 피드백 빈도와 {T_USER} 성과 상관관계")
+                        fig_s = px.scatter(df_dash, x='Comments', y='AvgScore', color='Program', hover_data=['Student'], size_max=15)
+                        fig_s.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
+                        st.plotly_chart(fig_s, use_container_width=True)
 
                 if "스택 막대 그래프 (출결 상세)" in selected_charts and heat_data:
                     with st.container(border=True):
-                        st.markdown(f"##### 📊 스택 막대 그래프: 프로그램별 출결 누적 구성")
+                        st.markdown(f"##### 📊 프로그램별 출결 누적 구성")
                         df_h = pd.DataFrame(heat_data)
-                        prog_map = {u['name']: u['program'] for u in users_to_show}
-                        df_h['Program'] = df_h['학생명'].map(prog_map)
-                        agg_df = df_h.groupby(['Program', '상태']).size().unstack(fill_value=0)
+                        agg_df = df_h.groupby(['프로그램', '상태']).size().unstack(fill_value=0).reset_index()
                         for col in ['출석', '지각', '결석', '병결']:
                             if col not in agg_df.columns: agg_df[col] = 0
-                        agg_df = agg_df[['출석', '지각', '결석', '병결']]
-                        fig_st, ax_st = plt.subplots(figsize=(10, 4))
-                        colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6']
-                        agg_df.plot(kind='bar', stacked=True, ax=ax_st, color=colors, edgecolor='white')
-                        st.pyplot(fig_st, use_container_width=True); plt.close(fig_st)
+                        fig_st = px.bar(agg_df, x='프로그램', y=['출석', '지각', '결석', '병결'], title="출결 스택 막대그래프", color_discrete_map=ATT_COLORS)
+                        st.plotly_chart(fig_st, use_container_width=True)
 
         # ---------------------------------------------------------
         # 행정 및 마스터 탭 모음
@@ -881,22 +855,21 @@ elif st.session_state.menu_option == UI['menu5']:
                             df_p = pd.DataFrame(db['payments'])
                             st.metric("💰 누적 총 매출 금액", f"{df_p['amount'].sum():,} 원")
                             
-                            fig_finance, (ax_f1, ax_f2) = plt.subplots(1, 2, figsize=(12, 5))
-                            cat_sum = df_p.groupby('category')['amount'].sum()
-                            ax_f1.pie(cat_sum, labels=cat_sum.index, autopct='%1.1f%%', startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'), colors=sns.color_palette('pastel'))
-                            ax_f1.set_title("항목별 매출 구성 비율")
-                            
-                            date_sum = df_p.groupby('date')['amount'].sum().reset_index()
-                            sns.barplot(data=date_sum, x='date', y='amount', ax=ax_f2, palette='viridis')
-                            ax_f2.tick_params(axis='x', rotation=45); ax_f2.set_title("일자별 매출 추이")
-                            
-                            st.pyplot(fig_finance, use_container_width=True)
-                            
-                            buf_fin = io.BytesIO()
-                            fig_finance.savefig(buf_fin, format="png", bbox_inches='tight', dpi=300)
-                            buf_fin.seek(0)
-                            st.download_button("📥 재무/매출 통계 차트 이미지(PNG) 다운로드", data=buf_fin, file_name=f"Finance_Charts_{today_str}.png", mime="image/png")
-                            plt.close(fig_finance)
+                            # ✨ 재무 파트 Plotly 차트 전환
+                            f_col1, f_col2 = st.columns(2)
+                            with f_col1:
+                                with st.container(border=True):
+                                    cat_sum = df_p.groupby('category')['amount'].sum().reset_index()
+                                    fig_f1 = px.pie(cat_sum, names='category', values='amount', hole=0.4, title="항목별 매출 구성 비율")
+                                    fig_f1.update_traces(textinfo='percent+label')
+                                    st.plotly_chart(fig_f1, use_container_width=True)
+                            with f_col2:
+                                with st.container(border=True):
+                                    date_sum = df_p.groupby('date')['amount'].sum().reset_index()
+                                    fig_f2 = px.bar(date_sum, x='date', y='amount', title="일자별 매출 추이", text='amount')
+                                    fig_f2.update_traces(texttemplate='%{text:,}원', textposition='outside')
+                                    st.plotly_chart(fig_f2, use_container_width=True)
+
                     else: st.error("🔒 **접근 제한:** 열람 권한이 부여된 '최고관리자' 또는 '전체 열람 권한 행정직원'만 접근할 수 있습니다.")
 
             with tab_create:
@@ -908,44 +881,23 @@ elif st.session_state.menu_option == UI['menu5']:
                     col_rs, col_re = st.columns(2) 
                     r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
                     d = st.text_area("소개"); v = st.text_input("유튜브 링크")
-                    
-                    # ✨ [친절한 작성 가이드 안내]
-                    w_input_placeholder = """[역할명 : 인원수]
-1. 단일 날짜 ➔ 2026-04-12 : 아이디어 회의
-2. 날짜 범위 ➔ 2026-04-12~2026-04-18 : 프로젝트 주간
-3. 시간 포함 ➔ 2026-04-20 (14:00~16:00) : 1차 특강
-- 세부 목표 1 (하이픈으로 시작)"""
-                    w_input = st.text_area("워크플로우 양식 (아래 예시를 참고하여 작성하세요!)", value=w_input_placeholder, height=200)
+                    w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
                     
                     if st.form_submit_button("개설하기", type="primary"):
                         pw = {}; pc = {}; cr = None
                         for line in w_input.split('\n'):
                             line = line.strip()
-                            if not line or line.startswith('1. 단일') or line.startswith('2. 날짜') or line.startswith('3. 시간'): continue
-                            
+                            if not line: continue
                             if line.startswith('[') and ']' in line:
                                 cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
                                 pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
                                 pw[cr] = []
                             elif cr and ':' in line and not line.startswith('-'):
-                                # ✨ [핵심 픽스] 정밀한 날짜/시간 파싱 (정규식 활용)
-                                match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
-                                if match:
-                                    dt_part = match.group(1).strip()
-                                    tk_part = match.group(2).strip()
-                                else:
-                                    dt_part, tk_part = line.split(':', 1) if ':' in line else (line, "")
-
-                                time_str = ""
-                                if '(' in dt_part and ')' in dt_part:
-                                    time_str = dt_part[dt_part.find('(')+1:dt_part.find(')')]
-                                    dt_part = dt_part[:dt_part.find('(')].strip()
-
-                                sd, ed = dt_part.split('~', 1) if '~' in dt_part else (dt_part, dt_part)
-                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "time": time_str.strip(), "task": tk_part.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                                dt, tk = line.split(':', 1)
+                                sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
+                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
                             elif cr and line.startswith('-'):
                                 if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
-                                
                         db['programs'].append({"title": t, "desc": d, "video": v, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
                         if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
                         if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
@@ -967,16 +919,10 @@ elif st.session_state.menu_option == UI['menu5']:
                             for t in tasks:
                                 sd, ed = get_date_range(t)
                                 time_str = t.get('time', '')
-                                
-                                date_str = ""
-                                if sd and ed and sd != ed: date_str = f"{sd}~{ed}"
-                                elif sd and sd != "-": date_str = sd
-                                
+                                date_str = f"{sd}~{ed}" if sd and ed and sd != ed else (sd if sd and sd != "-" else "")
                                 if time_str: date_str += f" ({time_str})"
-                                
                                 if date_str: initial_w += f"{date_str} : {t['task']}\n"
                                 else: initial_w += f"{t['task']}\n"
-                                
                                 for stask in t.get('subtasks', []): initial_w += f"- {stask['desc']}\n"
                             initial_w += "\n"
 
@@ -989,21 +935,13 @@ elif st.session_state.menu_option == UI['menu5']:
                             new_r_end = colD2.date_input("모집 종료일 수정", value=datetime.strptime(p_data.get('recruit_end', "2026-12-31"), "%Y-%m-%d"))
                             new_d = st.text_area("상세 내용", value=p_data['desc'])
                             new_v = st.text_input("유튜브 링크", value=p_data.get('video',''))
-                            
-                            w_input_edit_placeholder = """[역할명 : 인원수]
-1. 단일 날짜 ➔ 2026-04-12 : 아이디어 회의
-2. 날짜 범위 ➔ 2026-04-12~2026-04-18 : 프로젝트 주간
-3. 시간 포함 ➔ 2026-04-20 (14:00~16:00) : 1차 특강
-- 세부 목표 1 (하이픈으로 시작)"""
-                            st.info("💡 시간을 입력하실 때는 날짜 뒤에 **괄호()**를 사용하여 시간을 적어주세요. (예: `2026-03-23 (14:00~16:00) : 입시특강`)")
-                            new_w = st.text_area("워크플로우 수정 (시간 기입 가능!)", value=initial_w.strip(), height=300)
+                            new_w = st.text_area("워크플로우 수정", value=initial_w.strip(), height=300)
                             
                             if st.form_submit_button("수정 내용 저장", type="primary"):
                                 pw = {}; pc = {}; cr = None
                                 for line in new_w.split('\n'):
                                     line = line.strip()
                                     if not line or line.startswith('1. 단일') or line.startswith('2. 날짜') or line.startswith('3. 시간'): continue
-                                    
                                     if line.startswith('[') and ']' in line:
                                         cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
                                         pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
@@ -1011,8 +949,7 @@ elif st.session_state.menu_option == UI['menu5']:
                                     elif cr and ':' in line and not line.startswith('-'):
                                         match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
                                         if match:
-                                            dt_part = match.group(1).strip()
-                                            tk_part = match.group(2).strip()
+                                            dt_part = match.group(1).strip(); tk_part = match.group(2).strip()
                                         else:
                                             dt_part, tk_part = line.split(':', 1) if ':' in line else (line, "")
 
@@ -1054,9 +991,9 @@ elif st.session_state.menu_option == UI['menu5']:
                                 if save_data(db): st.success("수정 완료!"); time.sleep(2); st.session_state['admin_logged_in'] = False; st.rerun()
 
         # ---------------------------------------------------------
-        # [공통 탭 모음] 종합명단, 평가/코멘트, 출석관리, 상담, 학부모
+        # [공통 탭 모음]
         with tab_overview:
-            st.write("#### 📊 데이터 필터링 및 엑셀(이미지) 추출")
+            st.write("#### 📊 데이터 필터링 및 엑셀 추출")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             if users_to_show:
                 overview_data = []
@@ -1068,15 +1005,8 @@ elif st.session_state.menu_option == UI['menu5']:
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
-                fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
-                ax_table.axis('tight'); ax_table.axis('off')
-                table = ax_table.table(cellText=df_out.values, colLabels=df_out.columns, loc='center', cellLoc='center')
-                table.auto_set_font_size(False); table.set_fontsize(11); table.scale(1.2, 1.8)
-                for (row, col), cell in table.get_celld().items():
-                    if row == 0: cell.set_facecolor('#4f46e5'); cell.set_text_props(color='white', weight='bold')
-                
-                buf = io.BytesIO(); plt.savefig(buf, format="png", bbox_inches='tight', dpi=300); buf.seek(0); plt.close(fig_table) 
-                st.download_button("📥 결과 이미지(PNG) 다운로드", data=buf, file_name=f"YouthCanvas_명단_{datetime.now().strftime('%Y%m%d')}.png", mime="image/png", type="primary")
+                csv_data = df_out.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 학생 데이터 엑셀(CSV) 다운로드", data=csv_data, file_name=f"YouthCanvas_Students_{today_str}.csv", mime="text/csv")
             else: st.info("데이터가 없습니다.")
 
         with tab_eval:
@@ -1086,6 +1016,7 @@ elif st.session_state.menu_option == UI['menu5']:
                 col_sel1, col_sel2 = st.columns([5, 5])
                 eval_prog = col_sel1.selectbox("📋 프로그램 선택", my_programs, key="eval_prog")
                 prog_users = [(i, u) for i, u in enumerate(db['users']) if u['program'] == eval_prog]
+                
                 if not prog_users: st.warning(f"신청한 {T_USER}이 없습니다.")
                 else:
                     eval_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in prog_users}
@@ -1153,15 +1084,11 @@ elif st.session_state.menu_option == UI['menu5']:
                             pivot_df = df_att.pivot(index=f"{T_USER}명", columns='날짜', values='상태').fillna('-')
                             st.dataframe(pivot_df, use_container_width=True)
                             
-                            agg_df = df_att.groupby([f"{T_USER}명", '상태']).size().unstack(fill_value=0)
+                            agg_df = df_att.groupby([f"{T_USER}명", '상태']).size().unstack(fill_value=0).reset_index()
                             for col in ['출석', '지각', '결석', '병결']:
                                 if col not in agg_df.columns: agg_df[col] = 0
-                            agg_df = agg_df[['출석', '지각', '결석', '병결']]
-                            fig_att, ax_att = plt.subplots(figsize=(10, 4))
-                            colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6']
-                            agg_df.plot(kind='bar', stacked=True, ax=ax_att, color=colors, edgecolor='white')
-                            plt.xticks(rotation=15, ha='right')
-                            st.pyplot(fig_att, use_container_width=True); plt.close(fig_att)
+                            fig_att = px.bar(agg_df, x=f'{T_USER}명', y=['출석', '지각', '결석', '병결'], color_discrete_map=ATT_COLORS, title="학생별 누적 출결 현황")
+                            st.plotly_chart(fig_att, use_container_width=True)
                         else: st.info("아직 기록된 출석 데이터가 없습니다.")
                             
                     with att_sub3:
