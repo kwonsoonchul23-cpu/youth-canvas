@@ -275,7 +275,6 @@ if st.session_state.menu_option == UI['menu1']:
                     total_cap += cap; total_curr += curr
                     if curr < cap: is_all_full = False
                 
-                # 역할(roles_list)이 아예 등록되지 않았으면 신청 불가 처리
                 if not roles_list: is_all_full = True
                 
                 if not is_recruiting_period: status_badge = "<span class='badge-gray'>⏳ 기간종료</span>"
@@ -436,8 +435,9 @@ elif st.session_state.menu_option == UI['menu3']:
                     with st.form("apply_student_form", clear_on_submit=True):
                         st.markdown("##### 📝 신규 지원서 작성")
                         colA, colB = st.columns(2)
-                        user_name = colA.text_input(f"👤 {T_USER} 이름 (실명 입력)")
-                        user_pin = colB.text_input("🔑 나만의 접속 비밀번호 (숫자 4자리)", type="password", max_chars=4)
+                        # ✨ 이름에 영어, 특수문자, 띄어쓰기 등 완전 자유 허용
+                        user_name = colA.text_input(f"👤 {T_USER} 이름 (예: 권해리, John, 권해리 어머니 등 자유롭게)")
+                        user_pin = colB.text_input("🔑 접속 비밀번호 (숫자/문자 무관 4자리)", type="password", max_chars=4)
                         
                         role_options = []
                         for r, cap in selected_prog_data.get('roles_capacity', {}).items():
@@ -446,43 +446,52 @@ elif st.session_state.menu_option == UI['menu3']:
                         selected_role_strs = st.multiselect("🎭 희망 역할 (여러 개 동시 선택 가능)", role_options)
                         
                         if st.form_submit_button("✨ 최종 지원하기", use_container_width=True, type="primary"):
-                            if not user_name or not user_pin: st.error("이름과 비밀번호를 모두 입력하세요.")
+                            user_name_clean = user_name.strip()
+                            user_pin_clean = user_pin.strip()
+                            
+                            if not user_name_clean or not user_pin_clean: st.error("이름과 비밀번호를 모두 입력하세요.")
                             elif not selected_role_strs: st.error("희망 역할을 하나 이상 선택해주세요.")
                             elif any("마감" in r for r in selected_role_strs): st.error("마감된 역할이 포함되어 있습니다.")
                             else:
                                 added_count = 0
                                 for r_str in selected_role_strs:
-                                    actual_role = r_str.split(" (")[0]
-                                    my_tasks = copy.deepcopy(selected_prog_data['roles_workflow'][actual_role])
+                                    # ✨ 다국어/특수문자 완벽 파싱 (안전한 분리)
+                                    actual_role = r_str.rsplit(" (", 1)[0]
+                                    my_tasks = copy.deepcopy(selected_prog_data.get('roles_workflow', {}).get(actual_role, []))
                                     for t in my_tasks: t['score'] = 0; t['comment'] = ""
-                                    db['users'].append({"name": user_name, "pin": user_pin, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "parent_messages": [], "alias": "", "attendance": {}})
+                                    db['users'].append({"name": user_name_clean, "pin": user_pin_clean, "program": selected_prog_title, "role": actual_role, "workflow": my_tasks, "messages": [], "parent_messages": [], "alias": "", "attendance": {}})
                                     added_count += 1
                                 if save_data(db): 
-                                    st.success("🎉 지원 완료! [나의 목표 및 진행도] 탭에서 로그인해보세요.")
-                                    time.sleep(1); st.rerun()
+                                    st.success("🎉 지원이 완벽하게 완료되었습니다! 위쪽의 [나의 목표 및 진행도] 탭을 눌러 로그인해보세요.")
+                                    time.sleep(2); st.rerun()
                                 else:
                                     for _ in range(added_count): db['users'].pop()
+                                    st.error("🚨 서버 저장에 실패했습니다. (인터넷 연결 또는 DB 상태 확인)")
 
     with tab2:
         with st.container(border=True):
             with st.form("student_login_form"):
                 col_id, col_pw, col_btn = st.columns([4, 4, 2])
-                search_name = col_id.text_input(f"{T_USER} 이름", placeholder="예: 권해리")
+                search_name = col_id.text_input(f"{T_USER} 이름", placeholder="예: 홍길동, John, 홍길동 어머니")
                 search_pin = col_pw.text_input("비밀번호 (4자리)", type="password")
                 login_attempt = col_btn.form_submit_button("접속하기", use_container_width=True)
             
-            if search_name and search_pin:
-                my_data = [u for u in db['users'] if u['name'] == search_name and u.get('pin', '0000') == search_pin]
+            if login_attempt or (search_name and search_pin):
+                # ✨ 띄어쓰기 및 대소문자 무시하는 똑똑한 로그인 로직
+                s_name_clean = search_name.strip().lower()
+                s_pin_clean = search_pin.strip()
+                
+                my_data = [u for u in db['users'] if u['name'].strip().lower() == s_name_clean and str(u.get('pin', '0000')).strip() == s_pin_clean]
+                
                 if not my_data and login_attempt:
-                    st.error("정보가 일치하지 않습니다.")
+                    st.error("정보가 일치하지 않습니다. 이름의 띄어쓰기나 비밀번호를 확인해주세요.")
                 elif my_data:
                     st.divider()
                     st.markdown(f"### 🌟 **{search_name}**님의 맞춤형 대시보드")
                     st.info("💡 차트의 항목을 클릭하면 데이터를 켜고 끌 수 있으며, 마우스를 올리면 상세 수치가 보입니다.")
                     
-                    s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
+                    s_chart_options = ["막대 그래프 (프로그램별 성취도)", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
-                    st.write("")
                     
                     summary_rows = []; total_t_all = 0; total_d_all = 0; all_scores = []; att_counts = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}; trend_data = []
                     for d in my_data:
@@ -509,9 +518,9 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     df_summ = pd.DataFrame(summary_rows)
                     
-                    if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
+                    if "막대 그래프 (프로그램별 성취도)" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
-                            st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
+                            st.markdown("##### 📊 프로그램별 달성률 및 성취도")
                             c1, c2 = st.columns(2)
                             fig_s1 = px.bar(df_summ, x='프로그램', y='진행률(%)', color='프로그램', text='진행률(%)', title='활동 진행률')
                             fig_s1.update_traces(textposition='outside'); fig_s1.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
@@ -522,24 +531,19 @@ elif st.session_state.menu_option == UI['menu3']:
                             c2.plotly_chart(fig_s2, use_container_width=True)
 
                             if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다. 활동을 시작해보세요!")
-                            else:
-                                top_prog = df_summ.loc[df_summ['진행률(%)'].idxmax()]
-                                st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_prog['프로그램']}'의 달성률이 {top_prog['진행률(%)']}%로 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
+                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다!</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 🍩 나의 종합 출결 비율 (도넛 차트)")
+                            st.markdown("##### 🍩 나의 종합 출결 비율")
                             total_att = sum(att_counts.values())
                             if total_att == 0: st.info("📉 기록된 출결 데이터가 없습니다.")
                             else:
                                 labels = [k for k, v in att_counts.items() if v > 0]
                                 sizes = [v for v in att_counts.values() if v > 0]
-                                colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
-                                fig_d, ax_d = plt.subplots(figsize=(6, 4))
-                                ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
-                                ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontweight='bold')
-                                st.pyplot(fig_d, use_container_width=True)
-                                plt.close(fig_d)
+                                fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"총 {total_att}일 출결 기록")
+                                fig_d.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
+                                st.plotly_chart(fig_d, use_container_width=True)
                                 
                                 bad_att = att_counts['지각'] + att_counts['결석']
                                 if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 지각과 결석이 단 한 번도 없습니다! 완벽한 출석률입니다.</div></div>", unsafe_allow_html=True)
@@ -547,15 +551,13 @@ elif st.session_state.menu_option == UI['menu3']:
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
-                            if len(trend_data) < 2: st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
+                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
+                            if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l, ax_l = plt.subplots(figsize=(8, 4))
-                                sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
-                                ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_l, use_container_width=True)
-                                plt.close(fig_l)
+                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True, hover_data={"점수": True, "날짜": True})
+                                fig_l.update_yaxes(range=[0, 105])
+                                st.plotly_chart(fig_l, use_container_width=True)
 
                     st.divider()
                     st.markdown("### 🔍 개별 프로그램 세부 리포트")
@@ -567,7 +569,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 total_items += 1; done_items += 1 if t.get('done') else 0
                                 for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                             pct = int((done_items/total_items)*100) if total_items > 0 else 0
-                            st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                            st.metric("활동 달성률", f"{pct}%", f"{done_items} / {total_items} 완료")
                             st.progress(pct / 100)
 
                             st.write("#### ✅ 세부 활동 체크리스트")
@@ -596,10 +598,9 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if c2.form_submit_button("전송") and msg_input:
                                     data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
                                     if save_data(db): st.rerun()
-                elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 4] 학부모 공간
+# [페이지 4] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -612,8 +613,11 @@ elif st.session_state.menu_option == UI['menu4']:
             parent_pin = col_pw.text_input(f"{T_PARENT} 전용 비밀번호 (4자리)", type="password")
             login_attempt = col_btn.form_submit_button("로그인", use_container_width=True)
         
-        if parent_name and parent_pin:
-            my_parent_data = [p for p in db['parents'] if p['name'] == parent_name and p['pin'] == parent_pin]
+        if login_attempt or (parent_name and parent_pin):
+            s_name_clean = parent_name.strip().lower()
+            s_pin_clean = parent_pin.strip()
+            my_parent_data = [p for p in db['parents'] if p['name'].strip().lower() == s_name_clean and str(p.get('pin', '')).strip() == s_pin_clean]
+            
             if not my_parent_data and login_attempt:
                 st.error("정보가 일치하지 않습니다.")
             elif my_parent_data:
@@ -688,6 +692,7 @@ elif st.session_state.menu_option == UI['menu4']:
                                     if total_att_p > 0:
                                         labels = [k for k, v in att_counts_total.items() if v > 0]
                                         sizes = [v for v in att_counts_total.values() if v > 0]
+                                        colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                                         fig_dp = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"통합 출석일수: {total_att_p}일")
                                         fig_dp.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
                                         st.plotly_chart(fig_dp, use_container_width=True)
@@ -932,12 +937,10 @@ elif st.session_state.menu_option == UI['menu5']:
 
             with tab_create:
                 st.subheader("➕ 신규 프로그램 개설")
-                
-                # ✨ 직관적인 미디어 업로드 입력창
-                st.markdown("##### 🎬 1. 미디어 첨부 (선택)")
-                st.warning("🚨 **[필독] 동영상 직접 업로드의 한계 및 대안**\n\n현재 시스템은 무료 텍스트 데이터베이스(Firebase RTDB)를 활용해 구동 중입니다. 영상(mp4)을 올리면 텍스트(Base64)로 변환되어 저장되는데, **용량이 5~10MB만 넘어가도 과부하로 앱이 멈출 수 있습니다.**\n\n* **해결책 (무료):** 유튜브에 영상을 '일부 공개'로 올리신 후 **[유튜브 링크]**란에 붙여넣는 것이 가장 빠르고 안전합니다.")
-                
                 with st.form("create_form"):
+                    st.markdown("##### 🎬 1. 미디어 첨부 (선택)")
+                    st.warning("🚨 **[필독] 동영상 직접 업로드의 한계 및 대안**\n\n현재 시스템은 무료 데이터베이스를 활용해 구동 중입니다. 용량이 10MB만 넘어가도 과부하로 앱이 멈출 수 있습니다.\n\n* **해결책 (무료):** 유튜브에 영상을 '일부 공개'로 올리신 후 **[유튜브 링크]**란에 붙여넣는 것이 가장 빠르고 안전합니다.")
+                    
                     col_m1, col_m2, col_m3 = st.columns(3)
                     new_m_url_input = col_m1.text_input("📺 유튜브 링크", placeholder="https://youtu.be/...")
                     img_f = col_m2.file_uploader("🖼️ 이미지 (권장)", type=['png', 'jpg', 'jpeg'])
@@ -982,7 +985,6 @@ elif st.session_state.menu_option == UI['menu5']:
                             line = line.strip()
                             if not line or line.startswith('1. 단일') or line.startswith('2. 날짜') or line.startswith('3. 시간'): continue
                             
-                            # ✨ 역할 추출 로직 강화
                             if line.startswith('['):
                                 role_match = re.search(r'\[(.*?)\]', line)
                                 if role_match:
@@ -1000,19 +1002,12 @@ elif st.session_state.menu_option == UI['menu5']:
                             if cr and line.startswith('-'):
                                 if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
                             elif cr:
-                                # ✨ 시간 파서 완벽 적용 (괄호 기반 추출)
                                 match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
                                 if match:
-                                    dt_part = match.group(1).strip()
-                                    tk_part = match.group(2).strip()
+                                    dt_part = match.group(1).strip(); tk_part = match.group(2).strip()
                                 else:
-                                    if ':' in line:
-                                        parts = line.split(':', 1)
-                                        dt_part = parts[0].strip()
-                                        tk_part = parts[1].strip()
-                                    else:
-                                        dt_part = ""
-                                        tk_part = line
+                                    if ':' in line: parts = line.split(':', 1); dt_part = parts[0].strip(); tk_part = parts[1].strip()
+                                    else: dt_part = ""; tk_part = line
 
                                 date_match = re.search(r'\d{4}-\d{2}-\d{2}(?:\s*~\s*\d{4}-\d{2}-\d{2})?', dt_part)
                                 time_str = ""; sd = ""; ed = ""
@@ -1021,8 +1016,7 @@ elif st.session_state.menu_option == UI['menu5']:
                                     time_str = dt_part.replace(date_val, '').strip(' ()')
                                     if '~' in date_val: sd, ed = [x.strip() for x in date_val.split('~')]
                                     else: sd = date_val.strip(); ed = sd
-                                else:
-                                    sd = dt_part; ed = dt_part
+                                else: sd = dt_part; ed = dt_part
                                 
                                 pw[cr].append({"start_date": sd, "end_date": ed, "time": time_str, "task": tk_part, "subtasks": [], "done": False, "score":0, "comment":""})
                                 
@@ -1065,7 +1059,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         with st.form("edit_form"):
                             col_m1, col_m2, col_m3 = st.columns(3)
                             new_m_url_input = col_m1.text_input("📺 새 유튜브 링크", value=curr_m_url if curr_m_type == 'url' else "")
-                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (기존 덮어쓰기)", type=['png', 'jpg', 'jpeg'])
+                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (기덮어쓰기)", type=['png', 'jpg', 'jpeg'])
                             vid_f = col_m3.file_uploader("🎞️ 새 동영상 (10MB 이하)", type=['mp4', 'mov'])
                             del_media = st.checkbox("🗑️ 등록된 미디어 완전히 삭제하기")
                             
@@ -1089,8 +1083,7 @@ elif st.session_state.menu_option == UI['menu5']:
                                 
                                 try:
                                     if del_media:
-                                        final_m_url = ""
-                                        new_m_type = "url"
+                                        final_m_url = ""; new_m_type = "url"
                                     elif vid_f:
                                         new_m_type = "video"
                                         final_m_url = f"data:{vid_f.type};base64,{base64.b64encode(vid_f.read()).decode('utf-8')}"
@@ -1128,16 +1121,10 @@ elif st.session_state.menu_option == UI['menu5']:
                                     elif cr:
                                         match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
                                         if match:
-                                            dt_part = match.group(1).strip()
-                                            tk_part = match.group(2).strip()
+                                            dt_part = match.group(1).strip(); tk_part = match.group(2).strip()
                                         else:
-                                            if ':' in line:
-                                                parts = line.split(':', 1)
-                                                dt_part = parts[0].strip()
-                                                tk_part = parts[1].strip()
-                                            else:
-                                                dt_part = ""
-                                                tk_part = line
+                                            if ':' in line: parts = line.split(':', 1); dt_part = parts[0].strip(); tk_part = parts[1].strip()
+                                            else: dt_part = ""; tk_part = line
 
                                         date_match = re.search(r'\d{4}-\d{2}-\d{2}(?:\s*~\s*\d{4}-\d{2}-\d{2})?', dt_part)
                                         time_str = ""; sd = ""; ed = ""
@@ -1146,8 +1133,7 @@ elif st.session_state.menu_option == UI['menu5']:
                                             time_str = dt_part.replace(date_val, '').strip(' ()')
                                             if '~' in date_val: sd, ed = [x.strip() for x in date_val.split('~')]
                                             else: sd = date_val.strip(); ed = sd
-                                        else:
-                                            sd = dt_part; ed = dt_part
+                                        else: sd = dt_part; ed = dt_part
                                         
                                         pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "time": time_str.strip(), "task": tk_part.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
                                 
@@ -1215,7 +1201,8 @@ elif st.session_state.menu_option == UI['menu5']:
                 
                 if not prog_users: st.warning(f"신청한 {T_USER}이 없습니다.")
                 else:
-                    eval_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in prog_users}
+                    # ✨ 평가 선택 식별자 강화 (|| 사용)
+                    eval_user_options = {f"{u['name']} || {u['role']}": i for i, u in prog_users}
                     selected_user_label = col_sel2.selectbox(f"🎓 {T_USER} 선택", list(eval_user_options.keys()))
                     target_idx = eval_user_options[selected_user_label]
                     target_user = db['users'][target_idx]
@@ -1288,7 +1275,8 @@ elif st.session_state.menu_option == UI['menu5']:
                         else: st.info("아직 기록된 출석 데이터가 없습니다.")
                             
                     with att_sub3:
-                        att_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
+                        # ✨ 출석 수정 선택 식별자 강화 (|| 사용)
+                        att_user_options = {f"{u['name']} || {u['role']}": i for i, u in pu}
                         selected_user_label = st.selectbox(f"🎓 수정할 {T_USER} 선택", list(att_user_options.keys()), key="att_edit_user")
                         target_idx = att_user_options[selected_user_label]
                         target_user = db['users'][target_idx]
@@ -1314,7 +1302,8 @@ elif st.session_state.menu_option == UI['menu5']:
                 sel_p = st.selectbox("프로그램", my_programs, key="m_prog")
                 pu = [(i, u) for i, u in enumerate(db['users']) if u['program'] == sel_p]
                 if pu:
-                    ops = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
+                    # ✨ 1:1 상담 선택 식별자 강화 (|| 사용)
+                    ops = {f"{u['name']} || {u['role']}": i for i, u in pu}
                     t_idx = ops[st.selectbox(f"{T_USER} 선택", list(ops.keys()))]
                     tu = db['users'][t_idx]
                     with st.container(border=True):
@@ -1353,11 +1342,18 @@ elif st.session_state.menu_option == UI['menu5']:
                     col1, col2 = st.columns(2)
                     p_name = col1.text_input(f"{T_PARENT} 대표 이름")
                     p_pin = col2.text_input(f"비밀번호 (4자리)", type="password", max_chars=4)
-                    all_students = [f"{u['name']} - {u['program']} ({u['role']})" for u in db['users'] if u['program'] in my_programs]
-                    linked_sts = st.multiselect(f"연결할 {T_USER} 선택", all_students)
+                    
+                    # ✨ CRM 자녀 연결 시 파싱 에러 방지를 위한 절대 식별자(||) 사용
+                    all_students = [f"{u['name']} || {u['program']} || {u['role']}" for u in db['users'] if u['program'] in my_programs]
+                    linked_sts = st.multiselect(f"연결할 {T_USER} 선택", all_students, format_func=lambda x: x.replace(" || ", " - "))
+                    
                     if st.form_submit_button(f"새로운 계정 생성", type="primary"):
                         if p_name and len(p_pin) == 4 and linked_sts:
-                            parsed_students = [{"name": st_str.split(" - ")[0], "program": st_str.split(" - ")[1].split(" (")[0]} for st_str in linked_sts]
+                            parsed_students = []
+                            for st_str in linked_sts:
+                                parts = st_str.split(" || ")
+                                if len(parts) >= 2: parsed_students.append({"name": parts[0], "program": parts[1]})
+                            
                             db['parents'].append({"name": p_name, "pin": p_pin, "linked_students": parsed_students})
                             if save_data(db): st.success("계정 생성 완료!"); time.sleep(1); st.rerun()
                             
