@@ -10,15 +10,14 @@ import time
 import urllib.request
 import urllib.parse
 import io
+import base64  # ✨ 파일 클라우드 직접 저장을 위한 모듈 추가
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
 import plotly.express as px
-
-# --- [시스템 설정] 파일 업로드 디렉토리 생성 ---
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+import matplotlib.pyplot as plt  # ✨ 누락되었던 표 이미지 저장 도구 복구!
+import seaborn as sns 
+import matplotlib.font_manager as fm
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
@@ -31,18 +30,18 @@ def set_korean_font():
     try:
         if not os.path.exists(font_path):
             urllib.request.urlretrieve(font_url, font_path)
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        import matplotlib.font_manager as fm
         fm.fontManager.addfont(font_path)
         font_prop = fm.FontProperties(fname=font_path)
         font_name = font_prop.get_name()
         plt.rc('font', family=font_name)
-        plt.rcParams['axes.unicode_minus'] = False
-        plt.rcParams['figure.dpi'] = 300  
-        sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
     except:
-        pass
+        import platform
+        if platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
+        elif platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
+    
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['figure.dpi'] = 300  
+    sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
 
 set_korean_font()
 
@@ -57,11 +56,8 @@ st.markdown("""
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
-    .badge-gray { background-color: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .card-title { font-size: 1.4em; font-weight: 800; color: #1e293b; margin-bottom: 0.2em; }
-    .card-desc { font-size: 0.95em; color: #64748b; margin-bottom: 1em; }
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
-    
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.95em; text-align: left; margin-bottom: 10px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .schedule-table th { border-bottom: 2px solid #cbd5e1; padding: 12px; background-color: #f8fafc; font-weight: 800; color: #334155; }
     .schedule-table td { border-bottom: 1px solid #e2e8f0; padding: 12px; color: #1e293b; vertical-align: top; }
@@ -77,7 +73,6 @@ st.markdown("""
     .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
     .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
     .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
-    .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
     
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .cal-th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; text-align: center; font-weight: bold; }
@@ -99,7 +94,6 @@ st.markdown("""
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #2b7a78 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(5) { background-color: #e68128 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.15rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -285,7 +279,7 @@ if st.session_state.menu_option == UI['menu1']:
                 st.markdown(f"<div class='recruit-period'>🗓️ 모집 기간: {p_r_start} ~ {p_r_end}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='card-desc'>{prog['desc']}</div>", unsafe_allow_html=True)
                 
-                # ✨ 멀티미디어 업로드 처리 로직 (유튜브, 이미지, 동영상 판단하여 자동 렌더링)
+                # ✨ 멀티미디어 뷰어 (URL, Base64 이미지/동영상 호환)
                 m_type = prog.get('media_type', 'url')
                 m_url = prog.get('media_url', prog.get('video', ''))
                 
@@ -294,9 +288,9 @@ if st.session_state.menu_option == UI['menu1']:
                         clean_url = fix_youtube_url(m_url)
                         if clean_url: st.video(clean_url)
                     elif m_type == 'image':
-                        if os.path.exists(m_url): st.image(m_url, use_container_width=True)
+                        st.image(m_url, use_container_width=True)
                     elif m_type == 'video':
-                        if os.path.exists(m_url): st.video(m_url)
+                        st.video(m_url)
                 
                 tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
@@ -498,7 +492,6 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     df_summ = pd.DataFrame(summary_rows)
                     
-                    # ✨ Plotly 학생 차트
                     if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
                             st.markdown("##### 📊 프로그램별 달성률 및 성취도")
@@ -511,7 +504,7 @@ elif st.session_state.menu_option == UI['menu3']:
                             fig_s2.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig_s2.update_layout(yaxis=dict(range=[0, 105]))
                             c2.plotly_chart(fig_s2, use_container_width=True)
 
-                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다.")
+                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다. 활동 시작을 응원합니다!")
                             else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다!</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
@@ -567,7 +560,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if changed: 
                                     if save_data(db): st.rerun()
 
-                            st.write(f"#### 💬 1:1 비밀 소통 게시판 ({T_USER} 전용)")
+                            st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
                             chat_box = st.container(border=True, height=250)
                             with chat_box:
                                 if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -582,7 +575,7 @@ elif st.session_state.menu_option == UI['menu3']:
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 4] 학부모 공간
+# [페이지 4] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -644,7 +637,6 @@ elif st.session_state.menu_option == UI['menu4']:
                             selected_p_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요:", p_chart_options, default=p_chart_options)
                             df_p_summ = pd.DataFrame(p_summary_rows)
                             
-                            # ✨ Plotly 학부모 차트
                             if "막대 그래프 (자녀별 성취도/진행률) [추천]" in selected_p_charts and not df_p_summ.empty:
                                 p_col1, p_col2 = st.columns(2)
                                 with p_col1:
@@ -748,7 +740,7 @@ elif st.session_state.menu_option == UI['menu5']:
             tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_settings = tabs
 
         # ---------------------------------------------------------
-        # 경영 대시보드 (Plotly 전면 교체)
+        # 경영 대시보드
         with tab_dashboard:
             dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
             st.subheader(f"📈 {dashboard_title} 맞춤형 데이터 대시보드")
@@ -787,10 +779,10 @@ elif st.session_state.menu_option == UI['menu5']:
                 
                 df_dash = pd.DataFrame(dashboard_data); df_tasks = pd.DataFrame(task_data)
 
-                # ✨ 관리자 Plotly 차트 연동
+                # ✨ Plotly 관리자 차트 연동
                 if "막대 그래프 (프로그램별 평균 성취도)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
-                        st.markdown(f"##### 📊 프로그램별 평균 성취도 비교")
+                        st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
                         df_avg = df_dash.groupby('Program')['AvgScore'].mean().reset_index()
                         fig1 = px.bar(df_avg, x='Program', y='AvgScore', color='Program', text='AvgScore', title="프로그램별 전체 평균 점수")
                         fig1.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig1.update_layout(yaxis=dict(range=[0, 105]))
@@ -798,7 +790,7 @@ elif st.session_state.menu_option == UI['menu5']:
 
                 if "도넛 차트 (전체 출결 비율)" in selected_charts:
                     with st.container(border=True):
-                        st.markdown(f"##### 🍩 시설 전체 {T_USER} 출결 비율")
+                        st.markdown(f"##### 🍩 도넛 차트: 시설 전체 {T_USER} 출결 비율")
                         total_att = sum(att_counts_total.values())
                         if total_att > 0:
                             labels = [k for k, v in att_counts_total.items() if v > 0]
@@ -809,7 +801,7 @@ elif st.session_state.menu_option == UI['menu5']:
 
                 if "라인 그래프 (성취도 추이)" in selected_charts and len(trend_data) >= 2:
                     with st.container(border=True):
-                        st.markdown(f"##### 📈 시간에 따른 프로그램 성과 변화")
+                        st.markdown(f"##### 📈 라인 그래프: 시간에 따른 프로그램 성과 변화")
                         df_t = pd.DataFrame(trend_data).sort_values(by="날짜")
                         df_t_avg = df_t.groupby(['날짜', '프로그램'])['점수'].mean().reset_index()
                         fig_l = px.line(df_t_avg, x='날짜', y='점수', color='프로그램', markers=True)
@@ -818,24 +810,26 @@ elif st.session_state.menu_option == UI['menu5']:
 
                 if "히트맵 (출결 밀도)" in selected_charts and heat_data:
                     with st.container(border=True):
-                        st.markdown(f"##### 🔲 {T_USER}별 출결 패턴 밀도")
+                        st.markdown(f"##### 🔲 히트맵: {T_USER}별 출결 패턴 밀도")
                         df_h = pd.DataFrame(heat_data)
                         val_map = {'출석': 1, '지각': 0.5, '병결': -0.5, '결석': -1}
                         df_h['NumericStatus'] = df_h['상태'].map(val_map)
                         pivot_h = df_h.pivot_table(index='학생명', columns='날짜', values='NumericStatus', fill_value=0)
-                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
+                        
+                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), 
+                                          x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
                         st.plotly_chart(fig_h, use_container_width=True)
 
                 if "산점도 (피드백 효과)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
-                        st.markdown(f"##### 🎯 {T_ADMIN} 피드백 빈도와 {T_USER} 성과 상관관계")
+                        st.markdown(f"##### 🎯 산점도: {T_ADMIN} 피드백 빈도와 {T_USER} 성과 상관관계")
                         fig_s = px.scatter(df_dash, x='Comments', y='AvgScore', color='Program', hover_data=['Student'], size_max=15)
                         fig_s.update_traces(marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')))
                         st.plotly_chart(fig_s, use_container_width=True)
 
                 if "스택 막대 그래프 (출결 상세)" in selected_charts and heat_data:
                     with st.container(border=True):
-                        st.markdown(f"##### 📊 프로그램별 출결 누적 구성")
+                        st.markdown(f"##### 📊 스택 막대 그래프: 프로그램별 출결 누적 구성")
                         df_h = pd.DataFrame(heat_data)
                         agg_df = df_h.groupby(['프로그램', '상태']).size().unstack(fill_value=0).reset_index()
                         for col in ['출석', '지각', '결석', '병결']:
@@ -895,7 +889,6 @@ elif st.session_state.menu_option == UI['menu5']:
                             df_p = pd.DataFrame(db['payments'])
                             st.metric("💰 누적 총 매출 금액", f"{df_p['amount'].sum():,} 원")
                             
-                            # ✨ 재무 파트 Plotly 차트 전환
                             f_col1, f_col2 = st.columns(2)
                             with f_col1:
                                 with st.container(border=True):
@@ -909,30 +902,27 @@ elif st.session_state.menu_option == UI['menu5']:
                                     fig_f2 = px.bar(date_sum, x='date', y='amount', title="일자별 매출 추이", text='amount')
                                     fig_f2.update_traces(texttemplate='%{text:,}원', textposition='outside')
                                     st.plotly_chart(fig_f2, use_container_width=True)
-
                     else: st.error("🔒 **접근 제한:** 열람 권한이 부여된 '최고관리자' 또는 '전체 열람 권한 행정직원'만 접근할 수 있습니다.")
 
             with tab_create:
                 st.subheader("➕ 신규 프로그램 개설")
                 with st.form("create_form"):
                     st.markdown("##### 🎬 미디어 첨부 (선택)")
-                    media_choice = st.radio("첨부 방식", ["유튜브 링크", "이미지 업로드", "동영상 업로드"], horizontal=True, label_visibility="collapsed")
+                    media_choice = st.radio("첨부 방식", ["유튜브 링크", "이미지 첨부", "동영상 첨부"], horizontal=True, label_visibility="collapsed")
+                    
                     new_m_type = "url"
-                    new_m_url = ""
+                    new_m_url_input = ""
+                    img_f = None
+                    vid_f = None
+                    
                     if media_choice == "유튜브 링크":
-                        new_m_url = st.text_input("유튜브 링크 입력", placeholder="https://youtu.be/...")
-                    elif media_choice == "이미지 업로드":
+                        new_m_url_input = st.text_input("유튜브 링크 입력", placeholder="https://youtu.be/...")
+                    elif media_choice == "이미지 첨부":
                         new_m_type = "image"
-                        img_f = st.file_uploader("이미지 첨부", type=['png', 'jpg', 'jpeg'])
-                        if img_f:
-                            new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{img_f.name}")
-                            with open(new_m_url, "wb") as f: f.write(img_f.getbuffer())
-                    elif media_choice == "동영상 업로드":
+                        img_f = st.file_uploader("이미지 파일 선택", type=['png', 'jpg', 'jpeg'])
+                    elif media_choice == "동영상 첨부":
                         new_m_type = "video"
-                        vid_f = st.file_uploader("동영상 첨부", type=['mp4', 'mov', 'avi'])
-                        if vid_f:
-                            new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{vid_f.name}")
-                            with open(new_m_url, "wb") as f: f.write(vid_f.getbuffer())
+                        vid_f = st.file_uploader("동영상 파일 선택 (10MB 이하 권장)", type=['mp4', 'mov'])
                             
                     st.divider()
                     c1, c2 = st.columns([8, 2])
@@ -950,6 +940,15 @@ elif st.session_state.menu_option == UI['menu5']:
                     w_input = st.text_area("워크플로우 양식 (아래 예시를 참고하여 작성하세요!)", value=w_input_placeholder, height=200)
                     
                     if st.form_submit_button("개설하기", type="primary"):
+                        # ✨ Base64 클라우드 저장 처리 로직
+                        final_m_url = ""
+                        if new_m_type == "url":
+                            final_m_url = new_m_url_input
+                        elif new_m_type == "image" and img_f:
+                            final_m_url = f"data:{img_f.type};base64,{base64.b64encode(img_f.read()).decode('utf-8')}"
+                        elif new_m_type == "video" and vid_f:
+                            final_m_url = f"data:{vid_f.type};base64,{base64.b64encode(vid_f.read()).decode('utf-8')}"
+                            
                         pw = {}; pc = {}; cr = None
                         for line in w_input.split('\n'):
                             line = line.strip()
@@ -977,7 +976,7 @@ elif st.session_state.menu_option == UI['menu5']:
                             elif cr and line.startswith('-'):
                                 if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
                                 
-                        db['programs'].append({"title": t, "desc": d, "video": new_m_url if new_m_type=='url' else '', "media_type": new_m_type, "media_url": new_m_url, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
+                        db['programs'].append({"title": t, "desc": d, "video": final_m_url if new_m_type=='url' else '', "media_type": new_m_type, "media_url": final_m_url, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
                         if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
                         if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
                         else: db['programs'].pop()
@@ -1021,39 +1020,40 @@ elif st.session_state.menu_option == UI['menu5']:
                             curr_m_url = p_data.get('media_url', p_data.get('video', ''))
                             
                             idx_map = {"url": 0, "image": 1, "video": 2}
-                            media_choice = st.radio("첨부 방식", ["유튜브 링크", "이미지 업로드", "동영상 업로드"], index=idx_map.get(curr_m_type, 0), horizontal=True, label_visibility="collapsed")
+                            media_choice = st.radio("첨부 방식", ["유튜브 링크", "이미지 첨부", "동영상 첨부"], index=idx_map.get(curr_m_type, 0), horizontal=True, label_visibility="collapsed")
                             
-                            new_m_type = "url"
-                            new_m_url = curr_m_url
+                            new_m_type = curr_m_type
+                            new_m_url_input = curr_m_url
+                            img_f = None
+                            vid_f = None
                             
                             if media_choice == "유튜브 링크":
                                 new_m_type = "url"
-                                new_m_url = st.text_input("유튜브 링크 입력", value=curr_m_url if curr_m_type == 'url' else "")
-                            elif media_choice == "이미지 업로드":
+                                new_m_url_input = st.text_input("유튜브 링크 입력", value=curr_m_url if curr_m_type == 'url' else "")
+                            elif media_choice == "이미지 첨부":
                                 new_m_type = "image"
-                                if curr_m_type == 'image' and curr_m_url:
-                                    st.info(f"현재 등록된 이미지: {os.path.basename(curr_m_url)}")
+                                if curr_m_type == 'image' and curr_m_url: st.info("✅ 기존 이미지가 등록되어 있습니다.")
                                 img_f = st.file_uploader("새 이미지 첨부 (기존 덮어쓰기)", type=['png', 'jpg', 'jpeg'])
-                                if img_f:
-                                    new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{img_f.name}")
-                                    with open(new_m_url, "wb") as f: f.write(img_f.getbuffer())
-                                elif curr_m_type != 'image':
-                                    new_m_url = ""
-                            elif media_choice == "동영상 업로드":
+                            elif media_choice == "동영상 첨부":
                                 new_m_type = "video"
-                                if curr_m_type == 'video' and curr_m_url:
-                                    st.info(f"현재 등록된 동영상: {os.path.basename(curr_m_url)}")
-                                vid_f = st.file_uploader("새 동영상 첨부 (기존 덮어쓰기)", type=['mp4', 'mov', 'avi'])
-                                if vid_f:
-                                    new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{vid_f.name}")
-                                    with open(new_m_url, "wb") as f: f.write(vid_f.getbuffer())
-                                elif curr_m_type != 'video':
-                                    new_m_url = ""
+                                if curr_m_type == 'video' and curr_m_url: st.info("✅ 기존 동영상이 등록되어 있습니다.")
+                                vid_f = st.file_uploader("새 동영상 첨부 (기존 덮어쓰기, 10MB 이하 권장)", type=['mp4', 'mov'])
                                     
                             st.info("💡 시간을 입력하실 때는 날짜 뒤에 **괄호()**를 사용하여 시간을 적어주세요. (예: `2026-03-23 (14:00~16:00) : 입시특강`)")
                             new_w = st.text_area("워크플로우 수정 (시간 기입 가능!)", value=initial_w.strip(), height=300)
                             
                             if st.form_submit_button("수정 내용 저장", type="primary"):
+                                # ✨ Base64 클라우드 저장 처리 로직
+                                final_m_url = curr_m_url
+                                if new_m_type == "url":
+                                    final_m_url = new_m_url_input
+                                elif new_m_type == "image":
+                                    if img_f: final_m_url = f"data:{img_f.type};base64,{base64.b64encode(img_f.read()).decode('utf-8')}"
+                                    elif curr_m_type != "image": final_m_url = ""
+                                elif new_m_type == "video":
+                                    if vid_f: final_m_url = f"data:{vid_f.type};base64,{base64.b64encode(vid_f.read()).decode('utf-8')}"
+                                    elif curr_m_type != "video": final_m_url = ""
+                                
                                 pw = {}; pc = {}; cr = None
                                 for line in new_w.split('\n'):
                                     line = line.strip()
@@ -1103,13 +1103,13 @@ elif st.session_state.menu_option == UI['menu5']:
                                                                 if new_st_dict['desc'] == old_st_dict['desc']: new_st_dict['done'] = old_st_dict.get('done', False)
                                             u['workflow'] = new_user_workflow
                                 
-                                db['programs'][p_idx] = {"title": new_t, "desc": new_d, "video": new_m_url if new_m_type=='url' else '', "media_type": new_m_type, "media_url": new_m_url, "color": new_color, "recruit_start": new_r_start.strftime("%Y-%m-%d"), "recruit_end": new_r_end.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw}
+                                db['programs'][p_idx] = {"title": new_t, "desc": new_d, "video": final_m_url if new_m_type=='url' else '', "media_type": new_m_type, "media_url": final_m_url, "color": new_color, "recruit_start": new_r_start.strftime("%Y-%m-%d"), "recruit_end": new_r_end.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw}
                                 if save_data(db): st.success("수정 완료!"); time.sleep(2); st.session_state['admin_logged_in'] = False; st.rerun()
 
         # ---------------------------------------------------------
         # [공통 탭 모음] 종합명단, 평가/코멘트, 출석관리, 상담, 학부모
         with tab_overview:
-            st.write("#### 📊 데이터 필터링 및 엑셀(이미지) 추출")
+            st.write("#### 📊 데이터 필터링 및 엑셀 추출")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             if users_to_show:
                 overview_data = []
@@ -1129,15 +1129,8 @@ elif st.session_state.menu_option == UI['menu5']:
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
-                fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
-                ax_table.axis('tight'); ax_table.axis('off')
-                table = ax_table.table(cellText=df_out.values, colLabels=df_out.columns, loc='center', cellLoc='center')
-                table.auto_set_font_size(False); table.set_fontsize(11); table.scale(1.2, 1.8)
-                for (row, col), cell in table.get_celld().items():
-                    if row == 0: cell.set_facecolor('#4f46e5'); cell.set_text_props(color='white', weight='bold')
-                
-                buf = io.BytesIO(); plt.savefig(buf, format="png", bbox_inches='tight', dpi=300); buf.seek(0); plt.close(fig_table) 
-                st.download_button("📥 결과 이미지(PNG) 다운로드", data=buf, file_name=f"YouthCanvas_명단_{datetime.now().strftime('%Y%m%d')}.png", mime="image/png", type="primary")
+                csv_data = df_out.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 전체 명단 엑셀(CSV) 다운로드", data=csv_data, file_name=f"YouthCanvas_Students_{today_str}.csv", mime="text/csv")
             else: st.info("데이터가 없습니다.")
 
         with tab_eval:
@@ -1218,6 +1211,7 @@ elif st.session_state.menu_option == UI['menu5']:
                             agg_df = df_att.groupby([f"{T_USER}명", '상태']).size().unstack(fill_value=0).reset_index()
                             for col in ['출석', '지각', '결석', '병결']:
                                 if col not in agg_df.columns: agg_df[col] = 0
+                            
                             fig_att = px.bar(agg_df, x=f'{T_USER}명', y=['출석', '지각', '결석', '병결'], color_discrete_map=ATT_COLORS, title="학생별 누적 출결 현황")
                             st.plotly_chart(fig_att, use_container_width=True)
                         else: st.info("아직 기록된 출석 데이터가 없습니다.")
