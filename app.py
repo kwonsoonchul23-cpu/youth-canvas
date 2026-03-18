@@ -9,13 +9,42 @@ import copy
 import time
 import urllib.request
 import urllib.parse
+import io
 from datetime import datetime, date
 from collections import defaultdict
 import requests 
-import plotly.express as px  # ✨ 완벽한 상호작용을 위한 Plotly 라이브러리 도입!
+import plotly.express as px
+
+# --- [시스템 설정] 파일 업로드 디렉토리 생성 ---
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
 
 # --- [디자인 요소] 페이지 기본 설정 ---
 st.set_page_config(page_title="Youth Canvas | 청소년 활동 플랫폼", page_icon="🎨", layout="wide")
+
+# --- ✨ 시각화 폰트 설정 및 초고해상도(DPI) 세팅 ---
+@st.cache_resource
+def set_korean_font():
+    font_url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+    font_path = "NanumGothic.ttf"
+    try:
+        if not os.path.exists(font_path):
+            urllib.request.urlretrieve(font_url, font_path)
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import matplotlib.font_manager as fm
+        fm.fontManager.addfont(font_path)
+        font_prop = fm.FontProperties(fname=font_path)
+        font_name = font_prop.get_name()
+        plt.rc('font', family=font_name)
+        plt.rcParams['axes.unicode_minus'] = False
+        plt.rcParams['figure.dpi'] = 300  
+        sns.set_theme(style='whitegrid', font=plt.rcParams['font.family'], font_scale=1.0)
+    except:
+        pass
+
+set_korean_font()
 
 # --- [디자인 요소] 커스텀 CSS ---
 st.markdown("""
@@ -256,8 +285,18 @@ if st.session_state.menu_option == UI['menu1']:
                 st.markdown(f"<div class='recruit-period'>🗓️ 모집 기간: {p_r_start} ~ {p_r_end}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='card-desc'>{prog['desc']}</div>", unsafe_allow_html=True)
                 
-                clean_url = fix_youtube_url(prog.get('video'))
-                if clean_url: st.video(clean_url)
+                # ✨ 멀티미디어 업로드 처리 로직 (유튜브, 이미지, 동영상 판단하여 자동 렌더링)
+                m_type = prog.get('media_type', 'url')
+                m_url = prog.get('media_url', prog.get('video', ''))
+                
+                if m_url:
+                    if m_type == 'url':
+                        clean_url = fix_youtube_url(m_url)
+                        if clean_url: st.video(clean_url)
+                    elif m_type == 'image':
+                        if os.path.exists(m_url): st.image(m_url, use_container_width=True)
+                    elif m_type == 'video':
+                        if os.path.exists(m_url): st.video(m_url)
                 
                 tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
@@ -296,7 +335,7 @@ if st.session_state.menu_option == UI['menu1']:
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu3'])
 
 # =========================================================
-# [페이지 2] ✨ 전체 일정 (달력)
+# [페이지 2] ✨ 전체 일정 (독립된 달력 탭 및 다이렉트 수강신청)
 # =========================================================
 elif st.session_state.menu_option == UI['menu2']:
     st.markdown(f"## {UI['page2_title']}")
@@ -346,7 +385,12 @@ elif st.session_state.menu_option == UI['menu2']:
                         d = date.fromordinal(d_ord)
                         if d.year == sel_year and d.month == sel_month:
                             disp_title = f"[{prog_title_short}] {t['task']}"
-                            day_events[d.day].append({"title": disp_title, "color": prog_color, "tooltip": tooltip_text, "prog_name": prog_title_full})
+                            day_events[d.day].append({
+                                "title": disp_title, 
+                                "color": prog_color,
+                                "tooltip": tooltip_text,
+                                "prog_name": prog_title_full
+                            })
 
     html_cal = "<table class='cal-table'><tr>"
     days = ["월", "화", "수", "목", "금", "토", "일"]
@@ -365,10 +409,11 @@ elif st.session_state.menu_option == UI['menu2']:
                 html_cal += f"<td class='cal-td'><div class='cal-day-num'>{day}</div>{events_html}</td>"
         html_cal += "</tr>"
     html_cal += "</table>"
+    
     st.markdown(html_cal, unsafe_allow_html=True)
 
 # =========================================================
-# [페이지 3] 나의 이야기 (학생)
+# [페이지 3] 나의 이야기 (학생 화면)
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['page3_title']}")
@@ -442,6 +487,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 
                         pct = int((d_items/t_items)*100) if t_items > 0 else 0
                         avg_s = sum(s_list)/len(s_list) if s_list else 0
+                        
                         for d_key, att_info in d.get('attendance', {}).items():
                             if is_active_role_period(d, d_key):
                                 st_val = att_info.get('status')
@@ -504,7 +550,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 total_items += 1; done_items += 1 if t.get('done') else 0
                                 for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                             pct = int((done_items/total_items)*100) if total_items > 0 else 0
-                            st.metric("활동 달성률", f"{pct}%", f"{done_items} / {total_items} 완료")
+                            st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
                             st.progress(pct / 100)
 
                             st.write("#### ✅ 세부 활동 체크리스트")
@@ -635,7 +681,6 @@ elif st.session_state.menu_option == UI['menu4']:
                                 with st.container(border=True):
                                     st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
                                     df_trend_p = pd.DataFrame(trend_data_p).sort_values(by="날짜")
-                                    # 자녀명과 프로그램을 묶어서 범례 생성
                                     df_trend_p['분류'] = df_trend_p['자녀명'] + " (" + df_trend_p['프로그램'] + ")"
                                     fig_lp = px.line(df_trend_p, x='날짜', y='점수', color='분류', markers=True, hover_data={"점수": True, "날짜": True})
                                     fig_lp.update_yaxes(range=[0, 105])
@@ -746,7 +791,6 @@ elif st.session_state.menu_option == UI['menu5']:
                 if "막대 그래프 (프로그램별 평균 성취도)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 프로그램별 평균 성취도 비교")
-                        # 프로그램별 평균 계산
                         df_avg = df_dash.groupby('Program')['AvgScore'].mean().reset_index()
                         fig1 = px.bar(df_avg, x='Program', y='AvgScore', color='Program', text='AvgScore', title="프로그램별 전체 평균 점수")
                         fig1.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig1.update_layout(yaxis=dict(range=[0, 105]))
@@ -767,7 +811,6 @@ elif st.session_state.menu_option == UI['menu5']:
                     with st.container(border=True):
                         st.markdown(f"##### 📈 시간에 따른 프로그램 성과 변화")
                         df_t = pd.DataFrame(trend_data).sort_values(by="날짜")
-                        # 일자별 평균으로 단순화
                         df_t_avg = df_t.groupby(['날짜', '프로그램'])['점수'].mean().reset_index()
                         fig_l = px.line(df_t_avg, x='날짜', y='점수', color='프로그램', markers=True)
                         fig_l.update_yaxes(range=[0, 105])
@@ -780,10 +823,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         val_map = {'출석': 1, '지각': 0.5, '병결': -0.5, '결석': -1}
                         df_h['NumericStatus'] = df_h['상태'].map(val_map)
                         pivot_h = df_h.pivot_table(index='학생명', columns='날짜', values='NumericStatus', fill_value=0)
-                        
-                        # Plotly Heatmap
-                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), 
-                                          x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
+                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
                         st.plotly_chart(fig_h, use_container_width=True)
 
                 if "산점도 (피드백 효과)" in selected_charts and not df_dash.empty:
@@ -875,30 +915,69 @@ elif st.session_state.menu_option == UI['menu5']:
             with tab_create:
                 st.subheader("➕ 신규 프로그램 개설")
                 with st.form("create_form"):
+                    st.markdown("##### 🎬 미디어 첨부 (선택)")
+                    media_choice = st.radio("첨부 방식", ["유튜브 링크", "이미지 업로드", "동영상 업로드"], horizontal=True, label_visibility="collapsed")
+                    new_m_type = "url"
+                    new_m_url = ""
+                    if media_choice == "유튜브 링크":
+                        new_m_url = st.text_input("유튜브 링크 입력", placeholder="https://youtu.be/...")
+                    elif media_choice == "이미지 업로드":
+                        new_m_type = "image"
+                        img_f = st.file_uploader("이미지 첨부", type=['png', 'jpg', 'jpeg'])
+                        if img_f:
+                            new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{img_f.name}")
+                            with open(new_m_url, "wb") as f: f.write(img_f.getbuffer())
+                    elif media_choice == "동영상 업로드":
+                        new_m_type = "video"
+                        vid_f = st.file_uploader("동영상 첨부", type=['mp4', 'mov', 'avi'])
+                        if vid_f:
+                            new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{vid_f.name}")
+                            with open(new_m_url, "wb") as f: f.write(vid_f.getbuffer())
+                            
+                    st.divider()
                     c1, c2 = st.columns([8, 2])
                     t = c1.text_input("프로그램 명")
                     color = c2.color_picker("색상", "#4f46e5")
                     col_rs, col_re = st.columns(2) 
                     r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
-                    d = st.text_area("소개"); v = st.text_input("유튜브 링크")
-                    w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
+                    d = st.text_area("소개")
+                    
+                    w_input_placeholder = """[역할명 : 인원수]
+1. 단일 날짜 ➔ 2026-04-12 : 아이디어 회의
+2. 날짜 범위 ➔ 2026-04-12~2026-04-18 : 프로젝트 주간
+3. 시간 포함 ➔ 2026-04-20 (14:00~16:00) : 1차 특강
+- 세부 목표 1 (하이픈으로 시작)"""
+                    w_input = st.text_area("워크플로우 양식 (아래 예시를 참고하여 작성하세요!)", value=w_input_placeholder, height=200)
                     
                     if st.form_submit_button("개설하기", type="primary"):
                         pw = {}; pc = {}; cr = None
                         for line in w_input.split('\n'):
                             line = line.strip()
-                            if not line: continue
+                            if not line or line.startswith('1. 단일') or line.startswith('2. 날짜') or line.startswith('3. 시간'): continue
+                            
                             if line.startswith('[') and ']' in line:
                                 cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
                                 pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
                                 pw[cr] = []
                             elif cr and ':' in line and not line.startswith('-'):
-                                dt, tk = line.split(':', 1)
-                                sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
-                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                                match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
+                                if match:
+                                    dt_part = match.group(1).strip()
+                                    tk_part = match.group(2).strip()
+                                else:
+                                    dt_part, tk_part = line.split(':', 1) if ':' in line else (line, "")
+
+                                time_str = ""
+                                if '(' in dt_part and ')' in dt_part:
+                                    time_str = dt_part[dt_part.find('(')+1:dt_part.find(')')]
+                                    dt_part = dt_part[:dt_part.find('(')].strip()
+
+                                sd, ed = dt_part.split('~', 1) if '~' in dt_part else (dt_part, dt_part)
+                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "time": time_str.strip(), "task": tk_part.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
                             elif cr and line.startswith('-'):
                                 if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
-                        db['programs'].append({"title": t, "desc": d, "video": v, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
+                                
+                        db['programs'].append({"title": t, "desc": d, "video": new_m_url if new_m_type=='url' else '', "media_type": new_m_type, "media_url": new_m_url, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
                         if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
                         if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
                         else: db['programs'].pop()
@@ -919,7 +998,9 @@ elif st.session_state.menu_option == UI['menu5']:
                             for t in tasks:
                                 sd, ed = get_date_range(t)
                                 time_str = t.get('time', '')
-                                date_str = f"{sd}~{ed}" if sd and ed and sd != ed else (sd if sd and sd != "-" else "")
+                                date_str = ""
+                                if sd and ed and sd != ed: date_str = f"{sd}~{ed}"
+                                elif sd and sd != "-": date_str = sd
                                 if time_str: date_str += f" ({time_str})"
                                 if date_str: initial_w += f"{date_str} : {t['task']}\n"
                                 else: initial_w += f"{t['task']}\n"
@@ -934,8 +1015,43 @@ elif st.session_state.menu_option == UI['menu5']:
                             new_r_start = colD1.date_input("모집 시작일 수정", value=datetime.strptime(p_data.get('recruit_start', today_str), "%Y-%m-%d"))
                             new_r_end = colD2.date_input("모집 종료일 수정", value=datetime.strptime(p_data.get('recruit_end', "2026-12-31"), "%Y-%m-%d"))
                             new_d = st.text_area("상세 내용", value=p_data['desc'])
-                            new_v = st.text_input("유튜브 링크", value=p_data.get('video',''))
-                            new_w = st.text_area("워크플로우 수정", value=initial_w.strip(), height=300)
+                            
+                            st.markdown("##### 🎬 미디어 첨부 수정")
+                            curr_m_type = p_data.get('media_type', 'url')
+                            curr_m_url = p_data.get('media_url', p_data.get('video', ''))
+                            
+                            idx_map = {"url": 0, "image": 1, "video": 2}
+                            media_choice = st.radio("첨부 방식", ["유튜브 링크", "이미지 업로드", "동영상 업로드"], index=idx_map.get(curr_m_type, 0), horizontal=True, label_visibility="collapsed")
+                            
+                            new_m_type = "url"
+                            new_m_url = curr_m_url
+                            
+                            if media_choice == "유튜브 링크":
+                                new_m_type = "url"
+                                new_m_url = st.text_input("유튜브 링크 입력", value=curr_m_url if curr_m_type == 'url' else "")
+                            elif media_choice == "이미지 업로드":
+                                new_m_type = "image"
+                                if curr_m_type == 'image' and curr_m_url:
+                                    st.info(f"현재 등록된 이미지: {os.path.basename(curr_m_url)}")
+                                img_f = st.file_uploader("새 이미지 첨부 (기존 덮어쓰기)", type=['png', 'jpg', 'jpeg'])
+                                if img_f:
+                                    new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{img_f.name}")
+                                    with open(new_m_url, "wb") as f: f.write(img_f.getbuffer())
+                                elif curr_m_type != 'image':
+                                    new_m_url = ""
+                            elif media_choice == "동영상 업로드":
+                                new_m_type = "video"
+                                if curr_m_type == 'video' and curr_m_url:
+                                    st.info(f"현재 등록된 동영상: {os.path.basename(curr_m_url)}")
+                                vid_f = st.file_uploader("새 동영상 첨부 (기존 덮어쓰기)", type=['mp4', 'mov', 'avi'])
+                                if vid_f:
+                                    new_m_url = os.path.join(UPLOAD_DIR, f"{int(time.time())}_{vid_f.name}")
+                                    with open(new_m_url, "wb") as f: f.write(vid_f.getbuffer())
+                                elif curr_m_type != 'video':
+                                    new_m_url = ""
+                                    
+                            st.info("💡 시간을 입력하실 때는 날짜 뒤에 **괄호()**를 사용하여 시간을 적어주세요. (예: `2026-03-23 (14:00~16:00) : 입시특강`)")
+                            new_w = st.text_area("워크플로우 수정 (시간 기입 가능!)", value=initial_w.strip(), height=300)
                             
                             if st.form_submit_button("수정 내용 저장", type="primary"):
                                 pw = {}; pc = {}; cr = None
@@ -987,26 +1103,41 @@ elif st.session_state.menu_option == UI['menu5']:
                                                                 if new_st_dict['desc'] == old_st_dict['desc']: new_st_dict['done'] = old_st_dict.get('done', False)
                                             u['workflow'] = new_user_workflow
                                 
-                                db['programs'][p_idx] = {"title": new_t, "desc": new_d, "video": new_v, "color": new_color, "recruit_start": new_r_start.strftime("%Y-%m-%d"), "recruit_end": new_r_end.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw}
+                                db['programs'][p_idx] = {"title": new_t, "desc": new_d, "video": new_m_url if new_m_type=='url' else '', "media_type": new_m_type, "media_url": new_m_url, "color": new_color, "recruit_start": new_r_start.strftime("%Y-%m-%d"), "recruit_end": new_r_end.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw}
                                 if save_data(db): st.success("수정 완료!"); time.sleep(2); st.session_state['admin_logged_in'] = False; st.rerun()
 
         # ---------------------------------------------------------
-        # [공통 탭 모음]
+        # [공통 탭 모음] 종합명단, 평가/코멘트, 출석관리, 상담, 학부모
         with tab_overview:
-            st.write("#### 📊 데이터 필터링 및 엑셀 추출")
+            st.write("#### 📊 데이터 필터링 및 엑셀(이미지) 추출")
             users_to_show = [u for u in db['users'] if u['program'] in my_programs]
             if users_to_show:
                 overview_data = []
                 for u in users_to_show:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
-                    att_counts = sum(1 for d_key, v in u.get('attendance', {}).items() if is_active_role_period(u, d_key) and v.get('status') == '출석')
-                    overview_data.append({f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], "평균성취도(점)": pct, "총 출석(일)": att_counts})
+                    
+                    att_counts = 0
+                    for d_key, v in u.get('attendance', {}).items():
+                        if is_active_role_period(u, d_key) and v.get('status') == '출석':
+                            att_counts += 1
+                            
+                    overview_data.append({
+                        f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
+                        "평균성취도(점)": pct, "총 출석(일)": att_counts
+                    })
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
-                csv_data = df_out.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 학생 데이터 엑셀(CSV) 다운로드", data=csv_data, file_name=f"YouthCanvas_Students_{today_str}.csv", mime="text/csv")
+                fig_table, ax_table = plt.subplots(figsize=(10, max(2, len(df_out) * 0.5 + 1.5)))
+                ax_table.axis('tight'); ax_table.axis('off')
+                table = ax_table.table(cellText=df_out.values, colLabels=df_out.columns, loc='center', cellLoc='center')
+                table.auto_set_font_size(False); table.set_fontsize(11); table.scale(1.2, 1.8)
+                for (row, col), cell in table.get_celld().items():
+                    if row == 0: cell.set_facecolor('#4f46e5'); cell.set_text_props(color='white', weight='bold')
+                
+                buf = io.BytesIO(); plt.savefig(buf, format="png", bbox_inches='tight', dpi=300); buf.seek(0); plt.close(fig_table) 
+                st.download_button("📥 결과 이미지(PNG) 다운로드", data=buf, file_name=f"YouthCanvas_명단_{datetime.now().strftime('%Y%m%d')}.png", mime="image/png", type="primary")
             else: st.info("데이터가 없습니다.")
 
         with tab_eval:
