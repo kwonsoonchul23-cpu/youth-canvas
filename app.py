@@ -81,6 +81,7 @@ st.markdown("""
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #2b7a78 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(5) { background-color: #e68128 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.15rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -138,20 +139,18 @@ def clean_str_for_match(text): return re.sub(r'\s+', '', str(text).lower())
 
 # ==============================================================
 # ✨ [강력한 데이터 캐싱(최적화) 함수 모음]
-# Streamlit의 Top-to-Bottom 재실행 시 무거운 연산을 건너뛰게 합니다!
 # ==============================================================
-
 @st.cache_data(show_spinner=False)
-def prep_calendar_events(programs, users, sel_year, sel_month, today_str):
+def prep_calendar_events(programs, users, sel_year, sel_month, today_string):
     day_events = defaultdict(list)
     for prog in programs:
         prog_color = prog.get('color', '#4f46e5')
         prog_title_full = prog.get('title', '')
         prog_title_short = prog_title_full[:8] + ".." if len(prog_title_full) > 8 else prog_title_full
         
-        p_r_start = prog.get('recruit_start', today_str)
+        p_r_start = prog.get('recruit_start', today_string)
         p_r_end = prog.get('recruit_end', '2099-12-31')
-        is_recruiting = (p_r_start <= today_str <= p_r_end)
+        is_recruiting = (p_r_start <= today_string <= p_r_end)
 
         total_cap = 0; total_curr = 0
         roles_list = list(prog.get('roles_workflow', {}).items())
@@ -326,12 +325,14 @@ with st.sidebar:
         st.session_state['db'] = load_data(); st.toast("✅ 동기화 완료!"); time.sleep(1); st.rerun()
 st.session_state.menu_option = menu
 
+# ✨ 전역으로 '오늘 날짜' 변수를 설정하여 모든 탭에서 활용 (NameError 방지)
+today_str = datetime.now().strftime("%Y-%m-%d")
+
 # =========================================================
 # [페이지 1] 찾아보기 (탐색)
 # =========================================================
 if st.session_state.menu_option == UI['menu1']:
     st.markdown(f"## {UI['page1_title']}")
-    today_str = datetime.now().strftime("%Y-%m-%d")
     if not db['programs']: st.info("아직 개설된 프로그램이 없습니다. 관리자 페이지에서 프로그램을 만들어주세요.")
         
     col1, col2 = st.columns(2)
@@ -416,8 +417,7 @@ elif st.session_state.menu_option == UI['menu2']:
     cal = calendar.monthcalendar(sel_year, sel_month)
     st.markdown(f"<h3 style='text-align:center; margin-bottom:20px;'>{sel_year}년 {sel_month}월</h3>", unsafe_allow_html=True)
     
-    # ✨ 캘린더 생성 캐싱 활용으로 속도 극대화
-    day_events = prep_calendar_events(db['programs'], db['users'], sel_year, sel_month, datetime.now().strftime("%Y-%m-%d"))
+    day_events = prep_calendar_events(db['programs'], db['users'], sel_year, sel_month, today_str)
 
     html_cal = "<table class='cal-table'><tr>"
     days = ["월", "화", "수", "목", "금", "토", "일"]
@@ -439,7 +439,6 @@ elif st.session_state.menu_option == UI['menu2']:
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['page3_title']}")
-    today_str = datetime.now().strftime("%Y-%m-%d")
     tab1, tab2 = st.tabs(["📝 신규 프로그램 지원", "🎯 나의 목표 및 진행도 (로그인)"])
     
     with tab1:
@@ -512,12 +511,11 @@ elif st.session_state.menu_option == UI['menu3']:
                     s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
                     
-                    # ✨ 캐싱 활용 데이터 분석
                     df_summ, att_counts, trend_data = prep_student_dash(my_data)
                     
                     if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
-                            st.markdown("##### 📊 프로그램별 달성률 및 성취도")
+                            st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
                             c1, c2 = st.columns(2)
                             fig_s1 = px.bar(df_summ, x='프로그램', y='진행률(%)', color='프로그램', text='진행률(%)', title='활동 진행률')
                             fig_s1.update_traces(textposition='outside'); fig_s1.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
@@ -527,32 +525,32 @@ elif st.session_state.menu_option == UI['menu3']:
                             fig_s2.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig_s2.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
                             c2.plotly_chart(fig_s2, use_container_width=True)
 
-                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다.")
-                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다!</div></div>", unsafe_allow_html=True)
+                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다. 활동을 시작해보세요!")
+                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 🍩 나의 종합 출결 비율")
+                            st.markdown("##### 🍩 나의 종합 출결 비율 (도넛 차트)")
                             total_att = sum(att_counts.values())
                             if total_att == 0: st.info("📉 기록된 출결 데이터가 없습니다.")
                             else:
                                 labels = [k for k, v in att_counts.items() if v > 0]
                                 sizes = [v for v in att_counts.values() if v > 0]
                                 fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"총 {total_att}일 출결 기록")
-                                fig_d.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
+                                fig_d.update_traces(textposition='inside', textinfo='percent+label')
                                 st.plotly_chart(fig_d, use_container_width=True)
                                 
-                                bad_att = att_counts['지각'] + att_counts['결석']
-                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 완벽한 출석률입니다!</div></div>", unsafe_allow_html=True)
-                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다.</div></div>", unsafe_allow_html=True)
+                                bad_att = att_counts.get('지각', 0) + att_counts.get('결석', 0)
+                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 지각과 결석이 단 한 번도 없습니다! 완벽한 출석률입니다.</div></div>", unsafe_allow_html=True)
+                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다. 성실한 참여를 위해 출결 관리에 신경 써주세요.</div></div>", unsafe_allow_html=True)
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
-                            if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
+                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
+                            if len(trend_data) < 2: st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True, hover_data={"점수": True, "날짜": True})
+                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True)
                                 fig_l.update_yaxes(range=[0, 105])
                                 st.plotly_chart(fig_l, use_container_width=True)
                                 
@@ -572,7 +570,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 total_items += 1; done_items += 1 if t.get('done') else 0
                                 for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                             pct = int((done_items/total_items)*100) if total_items > 0 else 0
-                            st.metric("활동 달성률", f"{pct}%", f"{done_items} / {total_items} 완료")
+                            st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
                             st.progress(pct / 100)
 
                             st.write("#### ✅ 세부 활동 체크리스트")
@@ -589,7 +587,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if changed: 
                                     if save_data(db): st.rerun()
 
-                            st.write(f"#### 💬 1:1 비밀 소통 게시판 ({T_USER} 전용)")
+                            st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
                             chat_box = st.container(border=True, height=250)
                             with chat_box:
                                 if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -601,9 +599,10 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if c2.form_submit_button("전송") and msg_input:
                                     data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
                                     if save_data(db): st.rerun()
+                elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 4] 학부모 공간
+# [페이지 4] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -696,11 +695,10 @@ elif st.session_state.menu_option == UI['menu4']:
                                     if total_att_p > 0:
                                         labels = [k for k, v in att_counts_total.items() if v > 0]
                                         sizes = [v for v in att_counts_total.values() if v > 0]
-                                        colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                                         fig_dp = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"통합 출석일수: {total_att_p}일")
                                         fig_dp.update_traces(textposition='inside', textinfo='percent+label')
                                         st.plotly_chart(fig_dp, use_container_width=True)
-                                        bad_att_p = att_counts_total['지각'] + att_counts_total['결석']
+                                        bad_att_p = att_counts_total.get('지각', 0) + att_counts_total.get('결석', 0)
                                         if bad_att_p == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 완벽한 출결 관리입니다.</div></div>", unsafe_allow_html=True)
                                         else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석 누적 {bad_att_p}회 입니다.</div></div>", unsafe_allow_html=True)
                             
@@ -709,7 +707,7 @@ elif st.session_state.menu_option == UI['menu4']:
                                     st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
                                     df_trend_p = pd.DataFrame(trend_data_p).sort_values(by="날짜")
                                     df_trend_p['분류'] = df_trend_p['자녀명'] + " (" + df_trend_p['프로그램'] + ")"
-                                    fig_lp = px.line(df_trend_p, x='날짜', y='점수', color='분류', markers=True, hover_data={"점수": True, "날짜": True})
+                                    fig_lp = px.line(df_trend_p, x='날짜', y='점수', color='분류', markers=True)
                                     fig_lp.update_yaxes(range=[0, 105])
                                     st.plotly_chart(fig_lp, use_container_width=True)
                                     
@@ -785,8 +783,6 @@ elif st.session_state.menu_option == UI['menu5']:
         with tab_dashboard:
             dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
             st.subheader(f"📈 {dashboard_title} 맞춤형 데이터 대시보드")
-            
-            # ✨ 캐싱을 통한 관리자 데이터 최적화
             df_dash, df_tasks, att_counts_total, trend_data, heat_data = prep_admin_dash(db['users'], my_programs)
             
             if df_dash.empty: 
@@ -796,8 +792,7 @@ elif st.session_state.menu_option == UI['menu5']:
                 chart_options = ["막대 그래프 (프로그램별 평균 성취도)", "도넛 차트 (전체 출결 비율)", "라인 그래프 (성취도 추이)", "히트맵 (출결 밀도)", "산점도 (피드백 효과)", "스택 막대 그래프 (출결 상세)"]
                 selected_charts = st.multiselect("📊 화면에 띄울 차트를 선택하세요:", chart_options, default=["막대 그래프 (프로그램별 평균 성취도)", "산점도 (피드백 효과)"])
                 st.write("")
-
-                # ✨ 관리자 AI 차트 해석
+                
                 if "막대 그래프 (프로그램별 평균 성취도)" in selected_charts and not df_dash.empty:
                     with st.container(border=True):
                         st.markdown(f"##### 📊 막대 그래프: 프로그램별 평균 성취도 비교")
@@ -846,8 +841,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         df_h['NumericStatus'] = df_h['상태'].map(val_map)
                         pivot_h = df_h.pivot_table(index='학생명', columns='날짜', values='NumericStatus', fill_value=0)
                         
-                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), 
-                                          x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
+                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
                         st.plotly_chart(fig_h, use_container_width=True)
                         
                         bad_days = (df_h['상태'].isin(['결석', '병결'])).sum()
@@ -928,7 +922,6 @@ elif st.session_state.menu_option == UI['menu5']:
                 with fin_tab2:
                     staff_perm = admin_info.get('staff_permission', 'full') if is_super else admin_info.get('staff_permission', 'entry')
                     if staff_perm == 'full':
-                        # ✨ 캐싱된 재무 데이터 불러오기
                         df_pay, total_rev, cat_sum, date_sum = prep_finance(db['payments'])
                         st.markdown("##### 📈 기관 전체 재무 상태 및 매출 분석")
                         if df_pay.empty: st.info("시각화할 결제 데이터가 없습니다.")
@@ -948,20 +941,18 @@ elif st.session_state.menu_option == UI['menu5']:
                                     fig_f2.update_traces(texttemplate='%{text:,}원', textposition='outside')
                                     st.plotly_chart(fig_f2, use_container_width=True)
                                     st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 일자별 수입 변동성을 확인하세요.</div></div>", unsafe_allow_html=True)
-
                     else: st.error("🔒 **접근 제한:** 열람 권한이 부여된 '최고관리자' 또는 '전체 열람 권한 행정직원'만 접근할 수 있습니다.")
 
             with tab_create:
                 st.subheader("➕ 신규 프로그램 개설")
-                
-                st.markdown("##### 🎬 1. 미디어 첨부 (선택)")
-                st.warning("🚨 **[필독] 동영상 직접 업로드의 한계 및 대안**\n\n현재 시스템은 무료 텍스트 데이터베이스를 사용 중입니다. 영상(mp4)을 올리면 서버 과부하로 지원자들의 **수강신청이 에러(400)를 내며 튕길 수 있습니다.**\n\n* **해결책:** 유튜브에 영상을 '일부 공개'로 올리신 후 **[유튜브 링크]**란에 붙여넣는 것이 가장 빠르고 안전합니다. (이미지는 1MB 이하만 권장합니다.)")
-                
                 with st.form("create_form"):
+                    st.markdown("##### 🎬 1. 미디어 첨부 (선택)")
+                    st.warning("🚨 **[필독] 동영상 및 고용량 이미지 첨부 시 주의사항**\n\n현재 서버는 무료 텍스트 데이터베이스를 사용 중입니다. 용량이 1MB만 넘어가도 지원자들의 **수강신청이 에러(400)를 내며 튕길 수 있습니다.**\n\n* **완벽한 해결책:** 유튜브 영상이나 구글 드라이브 사진 링크를 **[유튜브 링크]**란에 붙여넣는 것이 가장 빠르고 안전합니다.")
+                    
                     col_m1, col_m2, col_m3 = st.columns(3)
-                    new_m_url_input = col_m1.text_input("📺 유튜브 링크 (가장 안전)", placeholder="https://youtu.be/...")
-                    img_f = col_m2.file_uploader("🖼️ 이미지 (1MB 이하)", type=['png', 'jpg', 'jpeg'])
-                    vid_f = col_m3.file_uploader("🎞️ 동영상 (비권장, 절대 금지)", type=['mp4', 'mov'])
+                    new_m_url_input = col_m1.text_input("📺 유튜브/외부 링크 (가장 안전)", placeholder="https://youtu.be/...")
+                    img_f = col_m2.file_uploader("🖼️ 직접 이미지 (1MB 이하 필수)", type=['png', 'jpg', 'jpeg'])
+                    vid_f = col_m3.file_uploader("🎞️ 직접 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
                             
                     st.divider()
                     st.markdown("##### 📝 2. 프로그램 기본 정보")
@@ -977,25 +968,19 @@ elif st.session_state.menu_option == UI['menu5']:
 2026-03-23 (14:00~16:00) : 1차 특강
 2026-03-30 (17:30~19:30) : 2차 특강
 - 세부 목표 (하이픈으로 시작)"""
-                    st.info("💡 **시간은 반드시 소괄호 `( )` 안에 적어주세요!** 그래야 시스템이 정확하게 인식합니다. (예: `2026-03-23 (14:00) : OT`)")
+                    st.info("💡 **시간은 반드시 소괄호 `( )` 안에 적어주세요!** (예: `2026-03-23 (14:00) : OT`)")
                     w_input = st.text_area("워크플로우 양식", value=w_input_placeholder, height=200)
                     
                     if st.form_submit_button("✨ 최종 개설하기", type="primary"):
                         final_m_url = ""
                         new_m_type = "url"
                         
-                        if img_f and img_f.size > 1.5 * 1024 * 1024:
-                            st.error("🚨 이미지 용량이 1.5MB를 초과합니다! 용량을 줄여서 다시 올려주세요.")
-                            st.stop()
-                        if vid_f and vid_f.size > 5 * 1024 * 1024:
-                            st.error("🚨 동영상 용량이 5MB를 초과합니다! 유튜브 링크를 사용해주세요.")
+                        if img_f and img_f.size > 1024 * 1024:
+                            st.error("🚨 이미지 용량이 1MB를 초과합니다! 용량을 줄여서 다시 올려주세요.")
                             st.stop()
                             
                         try:
-                            if vid_f:
-                                new_m_type = "video"
-                                final_m_url = f"data:{vid_f.type};base64,{base64.b64encode(vid_f.read()).decode('utf-8')}"
-                            elif img_f:
+                            if img_f:
                                 new_m_type = "image"
                                 final_m_url = f"data:{img_f.type};base64,{base64.b64encode(img_f.read()).decode('utf-8')}"
                             elif new_m_url_input:
@@ -1085,9 +1070,9 @@ elif st.session_state.menu_option == UI['menu5']:
                         
                         with st.form("edit_form"):
                             col_m1, col_m2, col_m3 = st.columns(3)
-                            new_m_url_input = col_m1.text_input("📺 새 유튜브 링크", value=curr_m_url if curr_m_type == 'url' else "")
-                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (기존 덮어쓰기)", type=['png', 'jpg', 'jpeg'])
-                            vid_f = col_m3.file_uploader("🎞️ 새 동영상 (10MB 이하)", type=['mp4', 'mov'])
+                            new_m_url_input = col_m1.text_input("📺 새 외부 링크 (가장 안전)", value=curr_m_url if curr_m_type == 'url' else "")
+                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (1MB 이하)", type=['png', 'jpg', 'jpeg'])
+                            vid_f = col_m3.file_uploader("🎞️ 새 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
                             del_media = st.checkbox("🗑️ 등록된 미디어 완전히 삭제하기 (서버 에러 400 발생 시 체크 필수!)")
                             
                             st.divider()
@@ -1108,19 +1093,13 @@ elif st.session_state.menu_option == UI['menu5']:
                                 final_m_url = curr_m_url
                                 new_m_type = curr_m_type
                                 
-                                if img_f and img_f.size > 1.5 * 1024 * 1024:
-                                    st.error("🚨 이미지 용량이 1.5MB를 초과합니다! 용량을 줄여서 다시 올려주세요.")
-                                    st.stop()
-                                if vid_f and vid_f.size > 5 * 1024 * 1024:
-                                    st.error("🚨 동영상 용량이 5MB를 초과합니다! 유튜브 링크를 사용해주세요.")
+                                if img_f and img_f.size > 1024 * 1024:
+                                    st.error("🚨 이미지 용량이 1MB를 초과합니다! 용량을 줄여서 다시 올려주세요.")
                                     st.stop()
                                     
                                 try:
                                     if del_media:
                                         final_m_url = ""; new_m_type = "url"
-                                    elif vid_f:
-                                        new_m_type = "video"
-                                        final_m_url = f"data:{vid_f.type};base64,{base64.b64encode(vid_f.read()).decode('utf-8')}"
                                     elif img_f:
                                         new_m_type = "image"
                                         final_m_url = f"data:{img_f.type};base64,{base64.b64encode(img_f.read()).decode('utf-8')}"
@@ -1128,7 +1107,7 @@ elif st.session_state.menu_option == UI['menu5']:
                                         new_m_type = "url"
                                         final_m_url = new_m_url_input
                                 except Exception as e:
-                                    st.error("🚨 파일 변환 오류입니다.")
+                                    st.error("🚨 파일 변환 중 오류가 발생했습니다.")
                                     st.stop()
 
                                 pw = {}; pc = {}; cr = None
