@@ -54,12 +54,17 @@ st.markdown("""
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
+    .badge-gray { background-color: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .card-title { font-size: 1.4em; font-weight: 800; color: #1e293b; margin-bottom: 0.2em; }
+    .card-desc { font-size: 0.95em; color: #64748b; margin-bottom: 1em; }
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
-    .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-bottom: 10px; }
-    .schedule-table th { border: 1px solid #cbd5e1; padding: 8px; background-color: #f1f5f9; font-weight: bold; color: #334155; }
-    .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; vertical-align: top; }
-    .schedule-table td.task-content { text-align: left; }
+    
+    /* ✨ 표(Table) 가독성 향상 디자인 */
+    .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.95em; text-align: left; margin-bottom: 10px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .schedule-table th { border-bottom: 2px solid #cbd5e1; padding: 12px; background-color: #f8fafc; font-weight: 800; color: #334155; }
+    .schedule-table td { border-bottom: 1px solid #e2e8f0; padding: 12px; color: #1e293b; vertical-align: top; }
+    .schedule-table tr:last-child td { border-bottom: none; }
+    .schedule-table tr:hover { background-color: #f1f5f9; }
     
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
     .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
@@ -72,7 +77,6 @@ st.markdown("""
     .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
     .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
     
-    /* 달력 및 이벤트 클릭 유도 CSS */
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .cal-th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; text-align: center; font-weight: bold; }
     .cal-td { border: 1px solid #cbd5e1; height: 110px; vertical-align: top; padding: 5px; background: #ffffff; }
@@ -113,17 +117,22 @@ def get_date_range(task_dict):
         return d.strip(), d.strip()
     return "", ""
 
+# ✨ [신규 추가] 시간까지 포함하여 예쁘게 라벨을 반환하는 함수
 def get_date_label(task_dict):
     sd, ed = get_date_range(task_dict)
-    if sd and ed and sd != ed: return f"[{sd} ~ {ed}] "
-    elif sd and sd != "-": return f"[{sd}] "
-    return ""
+    time_str = task_dict.get('time', '')
+    label = ""
+    if sd and ed and sd != ed: label = f"[{sd} ~ {ed}]"
+    elif sd and sd != "-": label = f"[{sd}]"
+    
+    if time_str:
+        label += f" ⏱️{time_str}"
+        
+    return label + " " if label else ""
 
-# ✨ [에러 원인 픽스!] 잃어버렸던 safe_key 함수 복구
 def safe_key(text): 
     return re.sub(r'[\.\$#\[\]/]', '_', text)
 
-# ✨ [시간 입력 지원 픽스!] 문자열 안에서 날짜(YYYY-MM-DD)만 안전하게 추출하는 로직 추가
 def extract_date(d_str):
     if not d_str: return None
     m = re.search(r'\d{4}-\d{2}-\d{2}', d_str)
@@ -285,39 +294,37 @@ if st.session_state.menu_option == UI['menu1']:
                 tags_html = "".join([f"<span class='badge-blue'>#{r}</span> " for r, _ in roles_list])
                 if tags_html: st.markdown(f"<div style='margin-bottom: 15px;'>{tags_html}</div>", unsafe_allow_html=True)
                 
-                grouped_tasks = defaultdict(list)
+                # ✨ [핵심 픽스] Flat Table 형식의 가독성 좋은 '전체 일정 요약' 생성
+                flat_tasks = []
                 for role, tasks in prog.get('roles_workflow', {}).items():
                     for t in tasks:
-                        label = get_date_label(t)
-                        date_val = label if label else "일정 미정"
+                        sd, ed = get_date_range(t)
+                        date_label = f"{sd} ~ {ed}" if sd and ed and sd != ed else (sd if sd and sd != "-" else "일정 미정")
+                        time_val = t.get('time', '')
+                        if not time_val: time_val = "-"
                         
                         sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
-                        if sub_texts:
-                            subs_html = "<br>".join([f"&nbsp;&nbsp;└ {desc}" for desc in sub_texts])
-                            task_display = f"<b>{t['task']}</b><br><span style='color:#64748b; font-size:0.9em;'>{subs_html}</span>"
-                        else:
-                            task_display = f"<b>{t['task']}</b>"
-                            
-                        grouped_tasks[date_val].append({"role": role, "task": task_display})
+                        subs_html = "<br>".join([f"&nbsp;&nbsp;└ {desc}" for desc in sub_texts])
+                        task_display = f"<b>{t['task']}</b><br><span style='color:#64748b; font-size:0.9em;'>{subs_html}</span>" if sub_texts else f"<b>{t['task']}</b>"
+                        
+                        # 정렬을 위한 키 생성
+                        sd_date = extract_date(sd)
+                        sort_key = sd_date.strftime("%Y-%m-%d") if sd_date else "9999-12-31"
+                        
+                        flat_tasks.append({
+                            "sort_key": sort_key,
+                            "date_label": date_label,
+                            "time": time_val,
+                            "role": role,
+                            "task": task_display
+                        })
                 
-                if grouped_tasks:
-                    def sort_by_number(d):
-                        nums = re.findall(r'\d+', d)
-                        return (0, int(nums[0]), d) if nums else (1, 0, d)
-                    sorted_dates = sorted(grouped_tasks.keys(), key=sort_by_number)
-                    max_roles_in_a_day = max([len(tasks) for tasks in grouped_tasks.values()] + [0])
-                    
+                if flat_tasks:
+                    flat_tasks.sort(key=lambda x: x['sort_key'])
                     with st.expander("📅 전체 일정 요약 보기"):
-                        html_table = "<table class='schedule-table'><tr><th>일정</th>"
-                        for _ in range(max_roles_in_a_day): html_table += "<th>역할</th><th>내용</th>"
-                        html_table += "</tr>"
-                        for d in sorted_dates:
-                            html_table += f"<tr><td style='font-weight:bold;'>{d}</td>"
-                            tasks_on_date = grouped_tasks[d]
-                            for i in range(max_roles_in_a_day):
-                                if i < len(tasks_on_date): html_table += f"<td>{tasks_on_date[i]['role']}</td><td class='task-content'>{tasks_on_date[i]['task']}</td>"
-                                else: html_table += "<td></td><td></td>"
-                            html_table += "</tr>"
+                        html_table = "<table class='schedule-table'><tr><th>일정(날짜)</th><th>시간</th><th>역할</th><th>상세 내용</th></tr>"
+                        for ft in flat_tasks:
+                            html_table += f"<tr><td style='font-weight:bold; white-space:nowrap;'>{ft['date_label']}</td><td style='white-space:nowrap; color:#b45309;'>{ft['time']}</td><td><span class='badge-blue'>{ft['role']}</span></td><td class='task-content'>{ft['task']}</td></tr>"
                         html_table += "</table>"
                         st.markdown(html_table, unsafe_allow_html=True)
 
@@ -362,19 +369,19 @@ elif st.session_state.menu_option == UI['menu2']:
         elif total_curr >= total_cap and total_cap > 0: status_str = "모집 마감 (정원 초과)"
         else: status_str = "🟢 모집중"
 
-        tooltip_text = f"[{prog_title_full}]&#10;상태: {status_str}&#10;모집기간: {p_r_start} ~ {p_r_end}&#10;현재인원: {total_curr} / {total_cap}명&#10;&#10;👉 클릭하여 상세정보 확인 및 지원하기"
-        
         for role, tasks in prog.get('roles_workflow', {}).items():
             for t in tasks:
                 sd_str, ed_str = get_date_range(t)
                 if not sd_str: continue
-                # ✨ 시간 입력 지원을 위한 안전한 날짜 추출
                 sd_date = extract_date(sd_str)
                 ed_date = extract_date(ed_str)
                 if sd_date and not ed_date: ed_date = sd_date
                 if not sd_date and ed_date: sd_date = ed_date
                 
                 if sd_date and ed_date:
+                    time_info = f"&#10;시간: {t.get('time')}" if t.get('time') else ""
+                    tooltip_text = f"[{prog_title_full}]&#10;과업: {t['task']}{time_info}&#10;&#10;상태: {status_str}&#10;모집기간: {p_r_start} ~ {p_r_end}&#10;현재인원: {total_curr} / {total_cap}명&#10;&#10;👉 클릭하여 상세정보 확인 및 지원하기"
+                    
                     for d_ord in range(sd_date.toordinal(), ed_date.toordinal() + 1):
                         d = date.fromordinal(d_ord)
                         if d.year == sel_year and d.month == sel_month:
@@ -465,7 +472,6 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
-                    st.write("")
                     
                     summary_rows = []; total_t_all = 0; total_d_all = 0; all_scores = []; att_counts = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}; trend_data = []
                     for d in my_data:
@@ -481,12 +487,10 @@ elif st.session_state.menu_option == UI['menu3']:
                                 
                         pct = int((d_items/t_items)*100) if t_items > 0 else 0
                         avg_s = sum(s_list)/len(s_list) if s_list else 0
-                        
                         for d_key, att_info in d.get('attendance', {}).items():
                             if is_active_role_period(d, d_key):
                                 st_val = att_info.get('status')
-                                if st_val in att_counts:
-                                    att_counts[st_val] += 1
+                                if st_val in att_counts: att_counts[st_val] += 1
                                 
                         total_t_all += t_items; total_d_all += d_items; all_scores.extend(s_list)
                         summary_rows.append({"프로그램": d['program'], "역할": d['role'], "진행률(%)": pct, "평균 성취도": avg_s})
@@ -501,14 +505,7 @@ elif st.session_state.menu_option == UI['menu3']:
                             ax_s1.set_ylim(0, 100); ax_s1.tick_params(axis='x', rotation=15)
                             sns.barplot(data=df_summ, x='프로그램', y='평균 성취도', ax=ax_s2, palette='flare')
                             ax_s2.set_ylim(0, 100); ax_s2.tick_params(axis='x', rotation=15)
-                            st.pyplot(fig_s1, use_container_width=True)
-                            plt.close(fig_s1)
-                            
-                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0:
-                                st.info("📉 진행된 목표나 평가가 없습니다. 활동을 시작해보세요!")
-                            else:
-                                top_prog = df_summ.loc[df_summ['진행률(%)'].idxmax()]
-                                st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{top_prog['프로그램']}'의 달성률이 {top_prog['진행률(%)']}%로 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
+                            st.pyplot(fig_s1, use_container_width=True); plt.close(fig_s1)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
@@ -522,23 +519,18 @@ elif st.session_state.menu_option == UI['menu3']:
                                 fig_d, ax_d = plt.subplots(figsize=(6, 4))
                                 ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
                                 ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontweight='bold')
-                                st.pyplot(fig_d, use_container_width=True)
-                                plt.close(fig_d)
-                                bad_att = att_counts['지각'] + att_counts['결석']
-                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 지각과 결석이 단 한 번도 없습니다! 완벽한 출석률입니다.</div></div>", unsafe_allow_html=True)
-                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다. 성실한 참여를 위해 출결 관리에 신경 써주세요.</div></div>", unsafe_allow_html=True)
+                                st.pyplot(fig_d, use_container_width=True); plt.close(fig_d)
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
                             st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
-                            if len(trend_data) < 2: st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
+                            if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
                                 fig_l, ax_l = plt.subplots(figsize=(8, 4))
                                 sns.lineplot(data=df_trend, x='날짜', y='점수', hue='프로그램', marker='o', ax=ax_l)
                                 ax_l.set_ylim(0, 105); ax_l.tick_params(axis='x', rotation=45)
-                                st.pyplot(fig_l, use_container_width=True)
-                                plt.close(fig_l)
+                                st.pyplot(fig_l, use_container_width=True); plt.close(fig_l)
 
                     st.divider()
                     st.markdown("### 🔍 개별 프로그램 세부 리포트")
@@ -582,7 +574,7 @@ elif st.session_state.menu_option == UI['menu3']:
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 4] 학부모 전용 라운지
+# [페이지 4] 학부모 공간
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -737,7 +729,7 @@ elif st.session_state.menu_option == UI['menu5']:
             tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_settings = tabs
 
         # ---------------------------------------------------------
-        # 경영 대시보드 (차트 선택 시스템 완벽 적용)
+        # 경영 대시보드
         with tab_dashboard:
             dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
             st.subheader(f"📈 {dashboard_title} 맞춤형 데이터 대시보드")
@@ -916,23 +908,44 @@ elif st.session_state.menu_option == UI['menu5']:
                     col_rs, col_re = st.columns(2) 
                     r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
                     d = st.text_area("소개"); v = st.text_input("유튜브 링크")
-                    w_input = st.text_area("워크플로우 양식 (시간 입력 가능! 예: [수강생 : 10명]\n2026-03-23 14:00~16:00 : 1차 특강\n- OT 및 오리엔테이션)", height=200)
+                    
+                    # ✨ [친절한 작성 가이드 안내]
+                    w_input_placeholder = """[역할명 : 인원수]
+1. 단일 날짜 ➔ 2026-04-12 : 아이디어 회의
+2. 날짜 범위 ➔ 2026-04-12~2026-04-18 : 프로젝트 주간
+3. 시간 포함 ➔ 2026-04-20 (14:00~16:00) : 1차 특강
+- 세부 목표 1 (하이픈으로 시작)"""
+                    w_input = st.text_area("워크플로우 양식 (아래 예시를 참고하여 작성하세요!)", value=w_input_placeholder, height=200)
                     
                     if st.form_submit_button("개설하기", type="primary"):
                         pw = {}; pc = {}; cr = None
                         for line in w_input.split('\n'):
                             line = line.strip()
-                            if not line: continue
+                            if not line or line.startswith('1. 단일') or line.startswith('2. 날짜') or line.startswith('3. 시간'): continue
+                            
                             if line.startswith('[') and ']' in line:
                                 cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
                                 pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
                                 pw[cr] = []
                             elif cr and ':' in line and not line.startswith('-'):
-                                dt, tk = line.split(':', 1)
-                                sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
-                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                                # ✨ [핵심 픽스] 정밀한 날짜/시간 파싱 (정규식 활용)
+                                match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
+                                if match:
+                                    dt_part = match.group(1).strip()
+                                    tk_part = match.group(2).strip()
+                                else:
+                                    dt_part, tk_part = line.split(':', 1) if ':' in line else (line, "")
+
+                                time_str = ""
+                                if '(' in dt_part and ')' in dt_part:
+                                    time_str = dt_part[dt_part.find('(')+1:dt_part.find(')')]
+                                    dt_part = dt_part[:dt_part.find('(')].strip()
+
+                                sd, ed = dt_part.split('~', 1) if '~' in dt_part else (dt_part, dt_part)
+                                pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "time": time_str.strip(), "task": tk_part.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
                             elif cr and line.startswith('-'):
                                 if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
+                                
                         db['programs'].append({"title": t, "desc": d, "video": v, "color": color, "recruit_start": r_s.strftime("%Y-%m-%d"), "recruit_end": r_e.strftime("%Y-%m-%d"), "roles_capacity": pc, "roles_workflow": pw})
                         if not is_super: next(a for a in db['admins'] if a['name'] == admin_info['name']).setdefault('programs', []).append(t)
                         if save_data(db): st.success("개설 완료!"); time.sleep(1); st.rerun()
@@ -953,9 +966,17 @@ elif st.session_state.menu_option == UI['menu5']:
                             initial_w += f"[{role} : {cap}명]\n"
                             for t in tasks:
                                 sd, ed = get_date_range(t)
-                                if sd and ed and sd != ed: initial_w += f"{sd} ~ {ed} : {t['task']}\n"
-                                elif sd and sd != "-": initial_w += f"{sd} : {t['task']}\n"
+                                time_str = t.get('time', '')
+                                
+                                date_str = ""
+                                if sd and ed and sd != ed: date_str = f"{sd}~{ed}"
+                                elif sd and sd != "-": date_str = sd
+                                
+                                if time_str: date_str += f" ({time_str})"
+                                
+                                if date_str: initial_w += f"{date_str} : {t['task']}\n"
                                 else: initial_w += f"{t['task']}\n"
+                                
                                 for stask in t.get('subtasks', []): initial_w += f"- {stask['desc']}\n"
                             initial_w += "\n"
 
@@ -968,21 +989,40 @@ elif st.session_state.menu_option == UI['menu5']:
                             new_r_end = colD2.date_input("모집 종료일 수정", value=datetime.strptime(p_data.get('recruit_end', "2026-12-31"), "%Y-%m-%d"))
                             new_d = st.text_area("상세 내용", value=p_data['desc'])
                             new_v = st.text_input("유튜브 링크", value=p_data.get('video',''))
-                            new_w = st.text_area("워크플로우 수정 (시간 입력 가능! 예: 2026-04-12 14:00~16:00 : 아이디어 회의)", value=initial_w.strip(), height=300)
+                            
+                            w_input_edit_placeholder = """[역할명 : 인원수]
+1. 단일 날짜 ➔ 2026-04-12 : 아이디어 회의
+2. 날짜 범위 ➔ 2026-04-12~2026-04-18 : 프로젝트 주간
+3. 시간 포함 ➔ 2026-04-20 (14:00~16:00) : 1차 특강
+- 세부 목표 1 (하이픈으로 시작)"""
+                            st.info("💡 시간을 입력하실 때는 날짜 뒤에 **괄호()**를 사용하여 시간을 적어주세요. (예: `2026-03-23 (14:00~16:00) : 입시특강`)")
+                            new_w = st.text_area("워크플로우 수정 (시간 기입 가능!)", value=initial_w.strip(), height=300)
                             
                             if st.form_submit_button("수정 내용 저장", type="primary"):
                                 pw = {}; pc = {}; cr = None
                                 for line in new_w.split('\n'):
                                     line = line.strip()
-                                    if not line: continue
+                                    if not line or line.startswith('1. 단일') or line.startswith('2. 날짜') or line.startswith('3. 시간'): continue
+                                    
                                     if line.startswith('[') and ']' in line:
                                         cr = safe_key(line[1:line.find(']')].split(':')[0].strip())
                                         pc[cr] = int(re.sub(r'[^0-9]', '', line.split(':')[1])) if ':' in line else 10
                                         pw[cr] = []
                                     elif cr and ':' in line and not line.startswith('-'):
-                                        dt, tk = line.split(':', 1)
-                                        sd, ed = dt.split('~', 1) if '~' in dt else (dt, dt)
-                                        pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "task": tk.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
+                                        match = re.match(r'^([\d\-\s~]+(?:\([^)]+\))?)\s*:\s*(.*)$', line)
+                                        if match:
+                                            dt_part = match.group(1).strip()
+                                            tk_part = match.group(2).strip()
+                                        else:
+                                            dt_part, tk_part = line.split(':', 1) if ':' in line else (line, "")
+
+                                        time_str = ""
+                                        if '(' in dt_part and ')' in dt_part:
+                                            time_str = dt_part[dt_part.find('(')+1:dt_part.find(')')]
+                                            dt_part = dt_part[:dt_part.find('(')].strip()
+
+                                        sd, ed = dt_part.split('~', 1) if '~' in dt_part else (dt_part, dt_part)
+                                        pw[cr].append({"start_date": sd.strip(), "end_date": ed.strip(), "time": time_str.strip(), "task": tk_part.strip(), "subtasks": [], "done": False, "score":0, "comment":""})
                                     elif cr and line.startswith('-'):
                                         if pw[cr]: pw[cr][-1]["subtasks"].append({"desc": line[1:].strip(), "done": False})
                                 
@@ -1023,16 +1063,8 @@ elif st.session_state.menu_option == UI['menu5']:
                 for u in users_to_show:
                     t_scores = [t.get('score', 0) for t in u['workflow']]
                     pct = int(sum(t_scores)/len(t_scores)) if t_scores else 0
-                    
-                    att_counts = 0
-                    for d_key, v in u.get('attendance', {}).items():
-                        if is_active_role_period(u, d_key) and v.get('status') == '출석':
-                            att_counts += 1
-                            
-                    overview_data.append({
-                        f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], 
-                        "평균성취도(점)": pct, "총 출석(일)": att_counts
-                    })
+                    att_counts = sum(1 for d_key, v in u.get('attendance', {}).items() if is_active_role_period(u, d_key) and v.get('status') == '출석')
+                    overview_data.append({f"{T_USER}명": u.get('alias') or u['name'], "프로그램": u['program'], "역할": u['role'], "평균성취도(점)": pct, "총 출석(일)": att_counts})
                 df_out = pd.DataFrame(overview_data).sort_values(by=["프로그램", f"{T_USER}명"])
                 st.dataframe(df_out, use_container_width=True, hide_index=True)
                 
@@ -1054,7 +1086,6 @@ elif st.session_state.menu_option == UI['menu5']:
                 col_sel1, col_sel2 = st.columns([5, 5])
                 eval_prog = col_sel1.selectbox("📋 프로그램 선택", my_programs, key="eval_prog")
                 prog_users = [(i, u) for i, u in enumerate(db['users']) if u['program'] == eval_prog]
-                
                 if not prog_users: st.warning(f"신청한 {T_USER}이 없습니다.")
                 else:
                     eval_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in prog_users}
