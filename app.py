@@ -8,6 +8,7 @@ import calendar
 import copy
 import time
 import urllib.request
+import urllib.parse
 import io
 from datetime import datetime, date
 from collections import defaultdict
@@ -48,6 +49,8 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
         font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
     }
+    svg, [data-baseweb="icon"], .material-icons { font-family: inherit !important; }
+
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
@@ -56,29 +59,41 @@ st.markdown("""
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; margin-bottom: 10px; }
     .schedule-table th { border: 1px solid #cbd5e1; padding: 8px; background-color: #f1f5f9; font-weight: bold; color: #334155; }
     .schedule-table td { border: 1px solid #cbd5e1; padding: 8px; color: #1e293b; vertical-align: top; }
+    .schedule-table td.task-content { text-align: left; }
     
+    .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
+    .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
+    .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
+    .info-text { color: #475569; font-weight: 500;}
+    
+    .crm-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; border-left: 6px solid #2b7a78; }
+    .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
+    .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
+    .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
+    .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
+    
+    /* 달력 및 이벤트 클릭 유도 CSS */
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .cal-th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; text-align: center; font-weight: bold; }
-    .cal-td { border: 1px solid #cbd5e1; height: 100px; vertical-align: top; padding: 5px; background: #ffffff; }
+    .cal-td { border: 1px solid #cbd5e1; height: 110px; vertical-align: top; padding: 5px; background: #ffffff; }
     .cal-td.empty { background: #f1f5f9; }
-    .cal-day-num { font-weight: bold; color: #475569; text-align: right; }
-    .cal-event { color: #ffffff; padding: 2px 5px; margin-bottom: 2px; font-size: 0.75em; border-radius: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .cal-day-num { font-weight: bold; color: #475569; text-align: right; margin-bottom: 4px; }
+    .cal-event { color: #ffffff; padding: 3px 6px; margin-bottom: 3px; font-size: 0.75em; border-radius: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s ease; }
+    .cal-event:hover { transform: scale(1.02); filter: brightness(1.15); box-shadow: 0 3px 6px rgba(0,0,0,0.2); }
 
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { 
         width: 100%; min-height: 60px; margin: 0 0 10px 0; padding: 10px 15px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
     }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #3b82f6 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background-color: #c13945 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #2b7a78 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(5) { background-color: #e68128 !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.15rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
-    
-    .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
-    .pos-text { color: #059669; font-weight: 600; }
-    .neg-text { color: #dc2626; font-weight: 600; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -87,6 +102,7 @@ def fix_youtube_url(url):
     if not url: return None
     url = url.replace("shorts/", "watch?v=")
     if "youtu.be/" in url: return f"https://www.youtube.com/watch?v={url.split('youtu.be/')[1].split('?')[0]}"
+    if "m.youtube.com" in url: return url.replace("m.youtube.com", "www.youtube.com")
     return url
 
 def get_date_range(task_dict):
@@ -103,14 +119,28 @@ def get_date_label(task_dict):
     elif sd and sd != "-": return f"[{sd}] "
     return ""
 
+# ✨ [에러 원인 픽스!] 잃어버렸던 safe_key 함수 복구
+def safe_key(text): 
+    return re.sub(r'[\.\$#\[\]/]', '_', text)
+
+# ✨ [시간 입력 지원 픽스!] 문자열 안에서 날짜(YYYY-MM-DD)만 안전하게 추출하는 로직 추가
+def extract_date(d_str):
+    if not d_str: return None
+    m = re.search(r'\d{4}-\d{2}-\d{2}', d_str)
+    if m:
+        try: return datetime.strptime(m.group(0), "%Y-%m-%d").date()
+        except: return None
+    return None
+
 def is_active_role_period(u_dict, target_date_str):
     u_dates = []
     for t in u_dict.get('workflow', []):
         sd, ed = get_date_range(t)
-        for d_str in [sd, ed]:
-            if d_str and re.match(r'\d{4}-\d{2}-\d{2}', d_str):
-                try: u_dates.append(datetime.strptime(d_str.strip(), "%Y-%m-%d").date())
-                except: pass
+        sd_date = extract_date(sd)
+        ed_date = extract_date(ed)
+        if sd_date: u_dates.append(sd_date)
+        if ed_date: u_dates.append(ed_date)
+        
     if not u_dates: return True 
     try:
         target_d_obj = datetime.strptime(target_date_str, "%Y-%m-%d").date()
@@ -118,7 +148,7 @@ def is_active_role_period(u_dict, target_date_str):
     except: return False
 
 # ==============================================================
-# ✨ [데이터베이스 연결 및 강력한 에러 방어(마이그레이션) 로직]
+# ✨ [데이터베이스 연결 로직]
 # ==============================================================
 today_str = datetime.now().strftime("%Y-%m-%d")
 
@@ -149,7 +179,7 @@ default_terms = {"super": "최고관리자", "admin": "선생님", "staff": "행
 default_ui = {
     "brand_title": "Youth Canvas", "brand_subtitle": "청소년의 꿈을 그리는 공간",
     "menu1": "🔍 찾아보기 (탐색)", "menu2": "📅 전체 일정", "menu3": "🙋 나의 이야기", 
-    "menu4": "👨‍👩‍👧 학부모 공간", "menu5": "🔒 부모님의 공간",
+    "menu4": "👨‍👩‍👧 학부모 공간", "menu5": "🔒 관리자 전용 포털",
     "page1_title": "✨ 지금 뜨고 있는 활동", "page2_title": "🗓️ 기관 전체 일정표", 
     "page3_title": "🙋 나의 활동 진행도", "page4_title": "👨‍👩‍👧 학부모 전용 라운지", "page5_title": "🔒 관리자 전용 포털"
 }
@@ -160,26 +190,19 @@ else:
     for k, v in default_terms.items():
         if k not in db['settings']['terms']: db['settings']['terms'][k] = v
 
-# ✨ [핵심 픽스] 과거 4개 메뉴 체계(DB)를 5개 메뉴 체계로 안전하게 밀어내고 채우는 마이그레이션 로직
-if 'ui' not in db['settings']: 
-    db['settings']['ui'] = default_ui
+if 'ui' not in db['settings']: db['settings']['ui'] = default_ui
 else:
     UI_temp = db['settings']['ui']
     if 'menu5' not in UI_temp:
-        # 과거 데이터를 뒤로 한 칸씩 밀어서 안전하게 보존합니다.
         UI_temp['menu5'] = UI_temp.get('menu4', default_ui['menu5'])
         UI_temp['menu4'] = UI_temp.get('menu3', default_ui['menu4'])
         UI_temp['menu3'] = UI_temp.get('menu2', default_ui['menu3'])
         UI_temp['menu2'] = default_ui['menu2']
-        
         UI_temp['page5_title'] = UI_temp.get('page4_title', default_ui['page5_title'])
         UI_temp['page4_title'] = UI_temp.get('page3_title', default_ui['page4_title'])
         UI_temp['page3_title'] = UI_temp.get('page2_title', default_ui['page3_title'])
         UI_temp['page2_title'] = default_ui['page2_title']
-        
-        # 클라우드에 변경사항 자동 업데이트
         save_data(db)
-
     for k, v in default_ui.items():
         if k not in UI_temp: UI_temp[k] = v
 
@@ -191,6 +214,26 @@ T_PARENT = db['settings']['terms']['parent']
 
 UI = db['settings']['ui']
 menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4'], UI['menu5']]
+
+# ==============================================================
+# ✨ [라우팅 로직] URL 파라미터를 읽어 다이렉트 이동 세팅
+# ==============================================================
+try:
+    if hasattr(st, 'query_params') and 'target_menu' in st.query_params:
+        if st.query_params['target_menu'] == 'apply':
+            st.session_state.menu_option = UI['menu3']
+            if 'prog' in st.query_params:
+                st.session_state['selected_prog_from_main'] = urllib.parse.unquote(st.query_params['prog'])
+        st.query_params.clear()
+    elif hasattr(st, 'experimental_get_query_params'):
+        qp = st.experimental_get_query_params()
+        if 'target_menu' in qp and qp['target_menu'][0] == 'apply':
+            st.session_state.menu_option = UI['menu3']
+            if 'prog' in qp:
+                st.session_state['selected_prog_from_main'] = urllib.parse.unquote(qp['prog'][0])
+        st.experimental_set_query_params()
+except Exception as e: pass
+
 if 'menu_option' not in st.session_state or st.session_state.menu_option not in menu_list: 
     st.session_state.menu_option = UI['menu1']
 
@@ -247,12 +290,14 @@ if st.session_state.menu_option == UI['menu1']:
                     for t in tasks:
                         label = get_date_label(t)
                         date_val = label if label else "일정 미정"
+                        
                         sub_texts = [stask['desc'] for stask in t.get('subtasks', [])]
                         if sub_texts:
                             subs_html = "<br>".join([f"&nbsp;&nbsp;└ {desc}" for desc in sub_texts])
                             task_display = f"<b>{t['task']}</b><br><span style='color:#64748b; font-size:0.9em;'>{subs_html}</span>"
                         else:
                             task_display = f"<b>{t['task']}</b>"
+                            
                         grouped_tasks[date_val].append({"role": role, "task": task_display})
                 
                 if grouped_tasks:
@@ -284,11 +329,11 @@ if st.session_state.menu_option == UI['menu1']:
                     st.session_state['selected_prog_from_main'] = prog['title']; change_page(UI['menu3'])
 
 # =========================================================
-# [페이지 2] ✨ 전체 일정 (독립된 달력 탭)
+# [페이지 2] ✨ 전체 일정 (독립된 달력 탭 및 다이렉트 수강신청)
 # =========================================================
 elif st.session_state.menu_option == UI['menu2']:
     st.markdown(f"## {UI['page2_title']}")
-    st.info("💡 개설된 모든 프로그램의 세부 일정(과업)을 캘린더 형태로 확인하실 수 있습니다.")
+    st.info("💡 개설된 모든 프로그램의 세부 일정(과업)을 캘린더 형태로 확인하실 수 있습니다. **일정을 클릭하면 즉시 수강신청 화면으로 이동합니다!**")
     
     now = datetime.now()
     c_col1, c_col2 = st.columns([2, 8])
@@ -301,21 +346,45 @@ elif st.session_state.menu_option == UI['menu2']:
     day_events = defaultdict(list)
     for prog in db['programs']:
         prog_color = prog.get('color', '#4f46e5')
-        prog_title = prog.get('title', '')[:8] + ".." if len(prog.get('title', '')) > 8 else prog.get('title', '')
+        prog_title_full = prog.get('title', '')
+        prog_title_short = prog_title_full[:8] + ".." if len(prog_title_full) > 8 else prog_title_full
+        
+        p_r_start = prog.get('recruit_start', today_str)
+        p_r_end = prog.get('recruit_end', '2099-12-31')
+        is_recruiting = (p_r_start <= today_str <= p_r_end)
+
+        total_cap = 0; total_curr = 0
+        for r, cap in prog.get('roles_capacity', {}).items():
+            curr = sum(1 for u in db['users'] if u['program'] == prog_title_full and u['role'] == r)
+            total_cap += cap; total_curr += curr
+
+        if not is_recruiting: status_str = "대기/마감 (기간 외)"
+        elif total_curr >= total_cap and total_cap > 0: status_str = "모집 마감 (정원 초과)"
+        else: status_str = "🟢 모집중"
+
+        tooltip_text = f"[{prog_title_full}]&#10;상태: {status_str}&#10;모집기간: {p_r_start} ~ {p_r_end}&#10;현재인원: {total_curr} / {total_cap}명&#10;&#10;👉 클릭하여 상세정보 확인 및 지원하기"
         
         for role, tasks in prog.get('roles_workflow', {}).items():
             for t in tasks:
                 sd_str, ed_str = get_date_range(t)
                 if not sd_str: continue
-                try:
-                    sd = datetime.strptime(sd_str, "%Y-%m-%d").date()
-                    ed = datetime.strptime(ed_str, "%Y-%m-%d").date()
-                    for d_ord in range(sd.toordinal(), ed.toordinal() + 1):
+                # ✨ 시간 입력 지원을 위한 안전한 날짜 추출
+                sd_date = extract_date(sd_str)
+                ed_date = extract_date(ed_str)
+                if sd_date and not ed_date: ed_date = sd_date
+                if not sd_date and ed_date: sd_date = ed_date
+                
+                if sd_date and ed_date:
+                    for d_ord in range(sd_date.toordinal(), ed_date.toordinal() + 1):
                         d = date.fromordinal(d_ord)
                         if d.year == sel_year and d.month == sel_month:
-                            disp_title = f"[{prog_title}] {t['task']}"
-                            day_events[d.day].append({"title": disp_title, "color": prog_color})
-                except: pass
+                            disp_title = f"[{prog_title_short}] {t['task']}"
+                            day_events[d.day].append({
+                                "title": disp_title, 
+                                "color": prog_color,
+                                "tooltip": tooltip_text,
+                                "prog_name": prog_title_full
+                            })
 
     html_cal = "<table class='cal-table'><tr>"
     days = ["월", "화", "수", "목", "금", "토", "일"]
@@ -327,15 +396,18 @@ elif st.session_state.menu_option == UI['menu2']:
         for day in week:
             if day == 0: html_cal += "<td class='cal-td empty'></td>"
             else:
-                events = "".join([f"<div class='cal-event' style='background:{ev['color']};' title='{ev['title']}'>{ev['title']}</div>" for ev in day_events[day]])
-                html_cal += f"<td class='cal-td'><div class='cal-day-num'>{day}</div>{events}</td>"
+                events_html = ""
+                for ev in day_events[day]:
+                    safe_prog_name = urllib.parse.quote(ev['prog_name'])
+                    events_html += f"<a href='/?target_menu=apply&prog={safe_prog_name}' target='_self' style='text-decoration: none;'><div class='cal-event' style='background:{ev['color']};' title='{ev['tooltip']}'>{ev['title']}</div></a>"
+                html_cal += f"<td class='cal-td'><div class='cal-day-num'>{day}</div>{events_html}</td>"
         html_cal += "</tr>"
     html_cal += "</table>"
     
     st.markdown(html_cal, unsafe_allow_html=True)
 
 # =========================================================
-# [페이지 3] 청소년 전용 페이지 (로그인 창)
+# [페이지 3] 나의 이야기 (학생 화면)
 # =========================================================
 elif st.session_state.menu_option == UI['menu3']:
     st.markdown(f"## {UI['page3_title']}")
@@ -393,6 +465,7 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
                     selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
+                    st.write("")
                     
                     summary_rows = []; total_t_all = 0; total_d_all = 0; all_scores = []; att_counts = {'출석': 0, '지각': 0, '결석': 0, '병결': 0}; trend_data = []
                     for d in my_data:
@@ -402,15 +475,18 @@ elif st.session_state.menu_option == UI['menu3']:
                             if t.get('score', 0) > 0:
                                 s_list.append(t.get('score'))
                                 sd, _ = get_date_range(t)
-                                if sd and re.match(r'\d{4}-\d{2}-\d{2}', sd): trend_data.append({"날짜": sd, "프로그램": d['program'], "점수": t['score']})
+                                sd_date = extract_date(sd)
+                                if sd_date: trend_data.append({"날짜": sd_date.strftime("%Y-%m-%d"), "프로그램": d['program'], "점수": t['score']})
                             for stask in t.get('subtasks', []): t_items += 1; d_items += 1 if stask.get('done') else 0
                                 
                         pct = int((d_items/t_items)*100) if t_items > 0 else 0
                         avg_s = sum(s_list)/len(s_list) if s_list else 0
+                        
                         for d_key, att_info in d.get('attendance', {}).items():
                             if is_active_role_period(d, d_key):
                                 st_val = att_info.get('status')
-                                if st_val in att_counts: att_counts[st_val] += 1
+                                if st_val in att_counts:
+                                    att_counts[st_val] += 1
                                 
                         total_t_all += t_items; total_d_all += d_items; all_scores.extend(s_list)
                         summary_rows.append({"프로그램": d['program'], "역할": d['role'], "진행률(%)": pct, "평균 성취도": avg_s})
@@ -455,7 +531,7 @@ elif st.session_state.menu_option == UI['menu3']:
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
                             st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
-                            if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
+                            if len(trend_data) < 2: st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
                                 fig_l, ax_l = plt.subplots(figsize=(8, 4))
@@ -506,7 +582,7 @@ elif st.session_state.menu_option == UI['menu3']:
                 elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
-# [페이지 4] 학부모 공간
+# [페이지 4] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -540,7 +616,8 @@ elif st.session_state.menu_option == UI['menu4']:
                                 if t.get('score', 0) > 0: 
                                     s_list.append(t.get('score'))
                                     sd, _ = get_date_range(t)
-                                    if sd and re.match(r'\d{4}-\d{2}-\d{2}', sd): trend_data_p.append({"날짜": sd, "자녀명": s_record['name'], "점수": t['score']})
+                                    sd_date = extract_date(sd)
+                                    if sd_date: trend_data_p.append({"날짜": sd_date.strftime("%Y-%m-%d"), "자녀명": s_record['name'], "점수": t['score']})
                                 for stask in t.get('subtasks', []): t_items += 1; d_items += 1 if stask.get('done') else 0
                                     
                             pct = int((d_items/t_items)*100) if t_items > 0 else 0
@@ -649,7 +726,6 @@ elif st.session_state.menu_option == UI['menu5']:
             
         tab_parent_title = f"👨‍👩‍👧 {T_PARENT} 계정"
         
-        # ✨ 권한별 탭 노출 분기 처리
         if is_super:
             tabs = st.tabs(["📈 경영 대시보드", "💳 행정/재무 관리", "📊 종합 명단", "📝 신규 개설", "⚙️ 정보 수정", "📝 평가/코멘트 작성", "✅ 출석 관리", "👥 1:1 상담", tab_parent_title, "🎨 화면 설정", "🔐 계정 관리"])
             tab_dashboard, tab_finance, tab_overview, tab_create, tab_edit, tab_eval, tab_attendance, tab_manage_users, tab_parents, tab_ui, tab_settings = tabs
@@ -661,7 +737,7 @@ elif st.session_state.menu_option == UI['menu5']:
             tab_dashboard, tab_eval, tab_overview, tab_attendance, tab_manage_users, tab_parents, tab_settings = tabs
 
         # ---------------------------------------------------------
-        # 공통 탭: 경영 대시보드
+        # 경영 대시보드 (차트 선택 시스템 완벽 적용)
         with tab_dashboard:
             dashboard_title = f"{T_SUPER} 전용" if is_super else f"{admin_info['name']} {T_ADMIN} 전용"
             st.subheader(f"📈 {dashboard_title} 맞춤형 데이터 대시보드")
@@ -693,8 +769,9 @@ elif st.session_state.menu_option == UI['menu5']:
                         sc = t.get('score', 0)
                         task_data.append({"Program": u['program'], "Task": t['task'], "Score": sc})
                         sd, _ = get_date_range(t)
-                        if sc > 0 and sd and re.match(r'\d{4}-\d{2}-\d{2}', sd):
-                            trend_data.append({"날짜": sd, "프로그램": u['program'], "점수": sc})
+                        sd_date = extract_date(sd)
+                        if sc > 0 and sd_date:
+                            trend_data.append({"날짜": sd_date.strftime("%Y-%m-%d"), "프로그램": u['program'], "점수": sc})
                 
                 df_dash = pd.DataFrame(dashboard_data); df_tasks = pd.DataFrame(task_data)
 
@@ -716,7 +793,6 @@ elif st.session_state.menu_option == UI['menu5']:
                             colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                             fig_d, ax_d = plt.subplots(figsize=(6, 4))
                             ax_d.pie(sizes, labels=labels, autopct='%1.1f%%', colors=colors, startangle=90, wedgeprops=dict(width=0.4, edgecolor='w'))
-                            ax_d.text(0, 0, f"총 {total_att}일", ha='center', va='center', fontweight='bold')
                             st.pyplot(fig_d, use_container_width=True); plt.close(fig_d)
 
                 if "라인 그래프 (성취도 추이)" in selected_charts and len(trend_data) >= 2:
@@ -762,7 +838,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         st.pyplot(fig_st, use_container_width=True); plt.close(fig_st)
 
         # ---------------------------------------------------------
-        # [행정 및 마스터 탭 모음] 결제, 신규 개설, 정보 수정
+        # 행정 및 마스터 탭 모음
         if is_super or is_staff:
             with tab_finance:
                 st.subheader(f"💳 {T_STAFF} 및 재무 결제 관리")
@@ -784,20 +860,8 @@ elif st.session_state.menu_option == UI['menu5']:
                             p_note = c6.text_input("비고 (예: 3월 수강료 2회분)")
                             
                             if st.form_submit_button("💾 결제 내역 저장", type="primary"):
-                                db['payments'].append({
-                                    "id": str(time.time()),
-                                    "date": p_date.strftime("%Y-%m-%d"),
-                                    "student": p_student,
-                                    "category": p_category,
-                                    "amount": p_amount,
-                                    "method": p_method,
-                                    "note": p_note,
-                                    "recorded_by": admin_info['name']
-                                })
-                                if save_data(db):
-                                    st.success("결제 내역이 안전하게 저장되었습니다.")
-                                    time.sleep(1)
-                                    st.rerun()
+                                db['payments'].append({"id": str(time.time()), "date": p_date.strftime("%Y-%m-%d"), "student": p_student, "category": p_category, "amount": p_amount, "method": p_method, "note": p_note, "recorded_by": admin_info['name']})
+                                if save_data(db): st.success("저장 완료"); time.sleep(1); st.rerun()
                         
                         st.divider()
                         st.markdown("##### 📋 통합 결제 내역 데이터베이스")
@@ -807,10 +871,7 @@ elif st.session_state.menu_option == UI['menu5']:
                             st.download_button("📥 전체 결제 내역 엑셀(CSV) 다운로드", data=csv_data, file_name=f"Payments_{today_str}.csv", mime="text/csv")
                             
                             df_pay['amount_fmt'] = df_pay['amount'].apply(lambda x: f"{x:,} 원")
-                            st.dataframe(df_pay[['date', 'student', 'category', 'amount_fmt', 'method', 'note', 'recorded_by']].rename(columns={
-                                'date': '결제일', 'student': '학생', 'category': '항목', 'amount_fmt': '금액', 
-                                'method': '결제수단', 'note': '비고', 'recorded_by': '입력담당자'
-                            }), use_container_width=True, hide_index=True)
+                            st.dataframe(df_pay[['date', 'student', 'category', 'amount_fmt', 'method', 'note', 'recorded_by']].rename(columns={'date': '결제일', 'student': '학생', 'category': '항목', 'amount_fmt': '금액', 'method': '결제수단', 'note': '비고', 'recorded_by': '입력담당자'}), use_container_width=True, hide_index=True)
                             
                             with st.expander("🗑️ 잘못 입력된 결제 내역 삭제"):
                                 del_id = st.selectbox("삭제할 내역 선택", df_pay['id'].tolist(), format_func=lambda x: f"{next(p['date'] for p in db['payments'] if p['id']==x)} - {next(p['student'] for p in db['payments'] if p['id']==x)} ({next(p['amount'] for p in db['payments'] if p['id']==x):,}원)")
@@ -844,8 +905,7 @@ elif st.session_state.menu_option == UI['menu5']:
                             buf_fin.seek(0)
                             st.download_button("📥 재무/매출 통계 차트 이미지(PNG) 다운로드", data=buf_fin, file_name=f"Finance_Charts_{today_str}.png", mime="image/png")
                             plt.close(fig_finance)
-                    else:
-                        st.error("🔒 **접근 제한:** 해당 페이지는 매출 시각화 및 세무 통계를 제공합니다. 열람 권한이 부여된 '최고관리자' 또는 '전체 열람 권한 행정직원'만 접근할 수 있습니다. (현재 단순 입력 모드)")
+                    else: st.error("🔒 **접근 제한:** 열람 권한이 부여된 '최고관리자' 또는 '전체 열람 권한 행정직원'만 접근할 수 있습니다.")
 
             with tab_create:
                 st.subheader("➕ 신규 프로그램 개설")
@@ -856,7 +916,7 @@ elif st.session_state.menu_option == UI['menu5']:
                     col_rs, col_re = st.columns(2) 
                     r_s = col_rs.date_input("시작일"); r_e = col_re.date_input("종료일")
                     d = st.text_area("소개"); v = st.text_input("유튜브 링크")
-                    w_input = st.text_area("워크플로우 양식 (예: [편집 : 5명]\n2026-04-26 : 1차 편집\n- 컷편집 (세부목표))", height=200)
+                    w_input = st.text_area("워크플로우 양식 (시간 입력 가능! 예: [수강생 : 10명]\n2026-03-23 14:00~16:00 : 1차 특강\n- OT 및 오리엔테이션)", height=200)
                     
                     if st.form_submit_button("개설하기", type="primary"):
                         pw = {}; pc = {}; cr = None
@@ -908,7 +968,7 @@ elif st.session_state.menu_option == UI['menu5']:
                             new_r_end = colD2.date_input("모집 종료일 수정", value=datetime.strptime(p_data.get('recruit_end', "2026-12-31"), "%Y-%m-%d"))
                             new_d = st.text_area("상세 내용", value=p_data['desc'])
                             new_v = st.text_input("유튜브 링크", value=p_data.get('video',''))
-                            new_w = st.text_area("워크플로우 수정 (기간은 물결 ~ 사용)", value=initial_w.strip(), height=300)
+                            new_w = st.text_area("워크플로우 수정 (시간 입력 가능! 예: 2026-04-12 14:00~16:00 : 아이디어 회의)", value=initial_w.strip(), height=300)
                             
                             if st.form_submit_button("수정 내용 저장", type="primary"):
                                 pw = {}; pc = {}; cr = None
