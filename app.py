@@ -149,7 +149,7 @@ default_terms = {"super": "최고관리자", "admin": "선생님", "staff": "행
 default_ui = {
     "brand_title": "Youth Canvas", "brand_subtitle": "청소년의 꿈을 그리는 공간",
     "menu1": "🔍 찾아보기 (탐색)", "menu2": "📅 전체 일정", "menu3": "🙋 나의 이야기", 
-    "menu4": "👨‍👩‍👧 학부모 공간", "menu5": "🔒 관리자 전용 포털",
+    "menu4": "👨‍👩‍👧 학부모 공간", "menu5": "🔒 부모님의 공간",
     "page1_title": "✨ 지금 뜨고 있는 활동", "page2_title": "🗓️ 기관 전체 일정표", 
     "page3_title": "🙋 나의 활동 진행도", "page4_title": "👨‍👩‍👧 학부모 전용 라운지", "page5_title": "🔒 관리자 전용 포털"
 }
