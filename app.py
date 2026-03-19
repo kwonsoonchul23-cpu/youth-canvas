@@ -88,7 +88,9 @@ st.markdown("""
 
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label { width: 100%; min-height: 60px; margin: 0 0 10px 0; padding: 10px 15px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label { 
+        width: 100%; min-height: 60px; margin: 0 0 10px 0; padding: 10px 15px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
+    }
     [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
     [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #3b82f6 !important; } 
@@ -100,6 +102,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- 공통 출결 컬러맵 ---
 ATT_COLORS = {'출석': '#2ECC71', '지각': '#FFC107', '결석': '#E74C3C', '병결': '#9B59B6'}
 
 # --- 유틸리티 함수 ---
@@ -127,7 +130,8 @@ def get_date_label(task_dict):
     if time_str: label += f" ⏱️{time_str}"
     return label + " " if label else ""
 
-def safe_key(text): return re.sub(r'[\.\$#\[\]/]', '_', text)
+def safe_key(text): 
+    return re.sub(r'[\.\$#\[\]/]', '_', text)
 
 def extract_date(d_str):
     if not d_str: return None
@@ -268,7 +272,6 @@ def load_data():
                 if 'payments' not in data: data['payments'] = []
                 if 'admins' not in data: data['admins'] = [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}]
                 if 'settings' not in data: data['settings'] = {}
-                # ✨ api_keys 초기화
                 if 'api_keys' not in data['settings']: data['settings']['api_keys'] = {"public_data": ""}
                 return data
     except: pass
@@ -321,7 +324,6 @@ else:
     for k, v in default_ui.items():
         if k not in UI_temp: UI_temp[k] = v
 
-# ✨ api_keys 세팅 확인
 if 'api_keys' not in db['settings']:
     db['settings']['api_keys'] = {"public_data": ""}
 
@@ -531,7 +533,7 @@ elif st.session_state.menu_option == UI['menu3']:
                     st.info("💡 차트의 범례(글씨)를 클릭하면 데이터를 켜고 끌 수 있습니다.")
                     
                     s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
-                    selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
+                    selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요:", s_chart_options, default=s_chart_options)
                     
                     df_summ, att_counts, trend_data = prep_student_dash(my_data)
                     
@@ -548,7 +550,7 @@ elif st.session_state.menu_option == UI['menu3']:
                             c2.plotly_chart(fig_s2, use_container_width=True)
 
                             if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다.")
-                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
+                            else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다!</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
@@ -559,7 +561,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 labels = [k for k, v in att_counts.items() if v > 0]
                                 sizes = [v for v in att_counts.values() if v > 0]
                                 fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"총 {total_att}일 출결 기록")
-                                fig_d.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
+                                fig_d.update_traces(textposition='inside', textinfo='percent+label')
                                 st.plotly_chart(fig_d, use_container_width=True)
                                 
                                 bad_att = att_counts.get('지각', 0) + att_counts.get('결석', 0)
@@ -572,7 +574,7 @@ elif st.session_state.menu_option == UI['menu3']:
                             if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True, hover_data={"점수": True, "날짜": True})
+                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True)
                                 fig_l.update_yaxes(range=[0, 105])
                                 st.plotly_chart(fig_l, use_container_width=True)
                                 
@@ -609,7 +611,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if changed: 
                                     if save_data(db): st.rerun()
 
-                            st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
+                            st.write(f"#### 💬 1:1 비밀 소통 게시판 ({T_USER} 전용)")
                             chat_box = st.container(border=True, height=250)
                             with chat_box:
                                 if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -623,7 +625,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                     if save_data(db): st.rerun()
 
 # =========================================================
-# [페이지 4] 학부모 전용 라운지
+# [페이지 4] 학부모 공간
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -716,6 +718,7 @@ elif st.session_state.menu_option == UI['menu4']:
                                     if total_att_p > 0:
                                         labels = [k for k, v in att_counts_total.items() if v > 0]
                                         sizes = [v for v in att_counts_total.values() if v > 0]
+                                        colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                                         fig_dp = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"통합 출석일수: {total_att_p}일")
                                         fig_dp.update_traces(textposition='inside', textinfo='percent+label')
                                         st.plotly_chart(fig_dp, use_container_width=True)
@@ -880,7 +883,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         corr = df_dash['Comments'].corr(df_dash['AvgScore'])
                         if pd.isna(corr): st.info("📉 데이터 변동성이 부족하여 상관계수를 도출할 수 없습니다.")
                         elif corr >= 0.3: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 피드백(코멘트) 수와 성취도 간에 양의 상관관계(계수: {corr:.2f})가 존재합니다.</div></div>", unsafe_allow_html=True)
-                        elif corr <= -0.3: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트와 성취도가 역상관(계수: {corr:.2f})을 보입니다. 피드백의 질적 점검이 필요합니다.</div></div>", unsafe_allow_html=True)
+                        elif corr <= -0.3: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트와 성취도가 역상관(계수: {corr:.2f})을 보문을 보입니다. 피드백의 질적 점검이 필요합니다.</div></div>", unsafe_allow_html=True)
                         else: st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 피드백 횟수와 성적 간에 뚜렷한 패턴이 관찰되지 않았습니다.</div></div>", unsafe_allow_html=True)
 
                 if "스택 막대 그래프 (출결 상세)" in selected_charts and heat_data:
@@ -1094,7 +1097,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         with st.form("edit_form"):
                             col_m1, col_m2, col_m3 = st.columns(3)
                             new_m_url_input = col_m1.text_input("📺 새 유튜브 링크", value=curr_m_url if curr_m_type == 'url' else "")
-                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (1MB 이하 필수)", type=['png', 'jpg', 'jpeg'])
+                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (기존 덮어쓰기)", type=['png', 'jpg', 'jpeg'])
                             vid_f = col_m3.file_uploader("🎞️ 새 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
                             del_media = st.checkbox("🗑️ 등록된 미디어 완전히 삭제하기 (서버 에러 400 발생 시 체크 필수!)")
                             
@@ -1310,7 +1313,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         else: st.info("아직 기록된 출석 데이터가 없습니다.")
                             
                     with att_sub3:
-                        att_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
+                        att_user_options = {f"{u['name']} ({u['role']})": i for i, u in pu}
                         selected_user_label = st.selectbox(f"🎓 수정할 {T_USER} 선택", list(att_user_options.keys()), key="att_edit_user")
                         target_idx = att_user_options[selected_user_label]
                         target_user = db['users'][target_idx]
@@ -1431,7 +1434,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         if save_data(db): st.rerun()
 
         # ---------------------------------------------------------
-        # 오직 Super 관리자만 접근 가능한 탭 (UI/외부 API 연동)
+        # 오직 Super 관리자만 접근 가능한 탭 (UI 화면 설정 / 순서 변경)
         if is_super:
             with tab_ui:
                 st.subheader("🎨 화면 UI 텍스트 수정")
@@ -1453,6 +1456,35 @@ elif st.session_state.menu_option == UI['menu5']:
                         UI['menu1'] = u2; UI['menu2'] = u2_2; UI['menu3'] = u3; UI['menu4'] = u4; UI['menu5'] = u5
                         save_data(db); st.session_state.menu_option = u5; st.rerun()
                         
+                st.divider()
+                
+                # ✨ 핵심 픽스: 메인 화면 프로그램 노출 순서 변경 기능 추가
+                st.subheader("🔄 메인 화면 프로그램 노출 순서 변경")
+                st.info("💡 [찾아보기] 탭에 표시되는 프로그램의 순서를 위아래로 조정할 수 있습니다.")
+                if db.get('programs'):
+                    prog_titles = [p['title'] for p in db['programs']]
+                    
+                    st.write("**현재 노출 순서:**")
+                    for i, title in enumerate(prog_titles):
+                        st.caption(f"{i+1}. {title}")
+                    
+                    c_sel, c_up, c_down = st.columns([6, 2, 2])
+                    selected_prog_to_move = c_sel.selectbox("순서를 변경할 프로그램 선택", prog_titles, label_visibility="collapsed")
+                    
+                    if c_up.button("⬆️ 위로 한 칸 이동", use_container_width=True):
+                        idx = prog_titles.index(selected_prog_to_move)
+                        if idx > 0:
+                            db['programs'][idx-1], db['programs'][idx] = db['programs'][idx], db['programs'][idx-1]
+                            if save_data(db): st.rerun()
+                    
+                    if c_down.button("⬇️ 아래로 한 칸 이동", use_container_width=True):
+                        idx = prog_titles.index(selected_prog_to_move)
+                        if idx < len(db['programs']) - 1:
+                            db['programs'][idx+1], db['programs'][idx] = db['programs'][idx], db['programs'][idx+1]
+                            if save_data(db): st.rerun()
+                else:
+                    st.info("개설된 프로그램이 없습니다.")
+                    
                 st.divider()
                 st.subheader("🔑 외부 API 연동 설정")
                 st.info("💡 공공데이터포털 등의 외부 서비스 API 키를 입력하여 연동합니다. 여기에 입력된 키는 안전하게 데이터베이스에 저장됩니다.")
