@@ -45,64 +45,95 @@ def set_korean_font():
 
 set_korean_font()
 
-# --- [디자인 요소] 커스텀 CSS ---
+# --- [디자인 요소] 커스텀 프리미엄 CSS ---
 st.markdown("""
     <style>
-    h1, h2, h3, h4, h5, h6, p, label, span, div, button, input, select, textarea, li, th, td {
-        font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
+    /* 트렌디한 폰트 적용 (Pretendard) */
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    html, body, [class*="css"] {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif !important;
+        letter-spacing: -0.02em;
     }
-    svg, [data-baseweb="icon"], .material-icons { font-family: inherit !important; }
+    
+    /* 앱 전체 배경색 부드럽게 */
+    .stApp { background-color: #f8fafc; }
+    
+    /* ✨ 글래스모피즘 (투명 유리) & 카드 호버 이펙트 */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        background: rgba(255, 255, 255, 0.7) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04) !important;
+        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    }
+    div[data-testid="stVerticalBlock"] > div[style*="border"]:hover {
+        transform: translateY(-5px) !important;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
+    }
 
-    .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
-    .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
-    .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
-    .badge-gray { background-color: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
-    .card-title { font-size: 1.4em; font-weight: 800; color: #1e293b; margin-bottom: 0.2em; }
-    .card-desc { font-size: 0.95em; color: #64748b; margin-bottom: 1em; }
+    /* ✨ 프리미엄 버튼 디자인 (그라데이션 & 애니메이션) */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        color: white !important;
+        font-weight: 800 !important;
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3) !important;
+        transition: all 0.3s ease !important;
+    }
+    button[kind="primary"]:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5) !important;
+        filter: brightness(1.1) !important;
+    }
+
+    /* 뱃지 및 기타 텍스트 고급화 */
+    .badge-green { background-color: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 800; margin-right: 5px; box-shadow: 0 2px 4px rgba(22,101,52,0.1); }
+    .badge-red { background-color: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 800; margin-right: 5px; box-shadow: 0 2px 4px rgba(153,27,27,0.1);}
+    .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 800; margin-right: 5px; border: 1px solid #c7d2fe; }
+    .badge-gray { background-color: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 800; margin-right: 5px; }
+    .card-title { font-size: 1.6em; font-weight: 900; color: #0f172a; margin-bottom: 0.3em; letter-spacing:-0.03em;}
     .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
     
-    .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.95em; text-align: left; margin-bottom: 10px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .schedule-table th { border-bottom: 2px solid #cbd5e1; padding: 12px; background-color: #f8fafc; font-weight: 800; color: #334155; }
-    .schedule-table td { border-bottom: 1px solid #e2e8f0; padding: 12px; color: #1e293b; vertical-align: top; }
-    .schedule-table tr:last-child td { border-bottom: none; }
-    .schedule-table tr:hover { background-color: #f1f5f9; }
+    /* 표 디자인 모던화 */
+    .schedule-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.95em; text-align: left; margin-bottom: 10px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .schedule-table th { padding: 16px; background-color: #f8fafc; font-weight: 800; color: #334155; border-bottom: 2px solid #e2e8f0; }
+    .schedule-table td { padding: 16px; color: #1e293b; vertical-align: top; border-bottom: 1px solid #f1f5f9; }
+    .schedule-table tr:hover td { background-color: #f8fafc; }
     
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
     .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
     .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
     .info-text { color: #475569; font-weight: 500;}
     
-    .crm-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; border-left: 6px solid #2b7a78; }
-    .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
-    .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
-    .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
-    .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
-    
-    .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .cal-th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; text-align: center; font-weight: bold; }
-    .cal-td { border: 1px solid #cbd5e1; height: 110px; vertical-align: top; padding: 5px; background: #ffffff; }
-    .cal-td.empty { background: #f1f5f9; }
-    .cal-day-num { font-weight: bold; color: #475569; text-align: right; margin-bottom: 4px; }
-    .cal-event { color: #ffffff; padding: 3px 6px; margin-bottom: 3px; font-size: 0.75em; border-radius: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s ease; }
-    .cal-event:hover { transform: scale(1.02); filter: brightness(1.15); box-shadow: 0 3px 6px rgba(0,0,0,0.2); }
+    /* 캘린더 고급화 */
+    .cal-table { width: 100%; border-collapse: separate; border-spacing: 4px; table-layout: fixed; }
+    .cal-th { background: transparent; padding: 10px; text-align: center; font-weight: 800; color:#64748b; font-size:0.9em; }
+    .cal-td { border-radius: 12px; height: 120px; vertical-align: top; padding: 8px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: all 0.2s ease; border: 1px solid #f1f5f9;}
+    .cal-td:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.06); transform: scale(1.02); z-index:10; }
+    .cal-td.empty { background: transparent; box-shadow:none; border:none;}
+    .cal-day-num { font-weight: 800; color: #334155; text-align: right; margin-bottom: 6px; font-size:1.1em;}
+    .cal-event { color: #ffffff; padding: 4px 8px; margin-bottom: 4px; font-size: 0.8em; border-radius: 6px; font-weight:600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: filter 0.2s ease; }
+    .cal-event:hover { filter: brightness(1.2); }
 
-    [data-testid="stSidebar"] { background-color: #261633 !important; }
-    [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
+    /* 사이드바 다크테마 프리미엄화 */
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important; border-right: none !important;}
+    [data-testid="stSidebarUserContent"] { padding: 2.5rem 1.5rem !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { 
-        width: 100%; min-height: 60px; margin: 0 0 10px 0; padding: 10px 15px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; 
+        width: 100%; min-height: 64px; margin: 0 0 12px 0; padding: 12px 20px; cursor: pointer; border-radius: 16px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: 1px solid rgba(255,255,255,0.05);
     }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label > div:first-child div { background-color: transparent !important; border-color: rgba(255,255,255,0.6) !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background-color: #5c358f !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background-color: #3b82f6 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background-color: #c13945 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background-color: #2b7a78 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(5) { background-color: #e68128 !important; } 
-    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.15rem !important; font-weight: 900 !important; color: #ffffff !important; margin: 0 !important; }
-    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.03); filter: brightness(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(1) { background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);} 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);} 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(3) { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important; box-shadow: 0 4px 15px rgba(219, 39, 119, 0.3);} 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(4) { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);} 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(5) { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; box-shadow: 0 4px 15px rgba(217, 119, 6, 0.3);} 
+    [data-testid="stSidebar"] div[role="radiogroup"] > label p { font-size: 1.1rem !important; font-weight: 800 !important; color: #ffffff !important; margin: 0 !important; letter-spacing: -0.02em;}
+    [data-testid="stSidebar"] div[role="radiogroup"] > label:hover { transform: scale(1.04) translateX(5px); filter: brightness(1.15); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 공통 출결 컬러맵 ---
 ATT_COLORS = {'출석': '#2ECC71', '지각': '#FFC107', '결석': '#E74C3C', '병결': '#9B59B6'}
 
 # --- 유틸리티 함수 ---
@@ -130,8 +161,7 @@ def get_date_label(task_dict):
     if time_str: label += f" ⏱️{time_str}"
     return label + " " if label else ""
 
-def safe_key(text): 
-    return re.sub(r'[\.\$#\[\]/]', '_', text)
+def safe_key(text): return re.sub(r'[\.\$#\[\]/]', '_', text)
 
 def extract_date(d_str):
     if not d_str: return None
@@ -258,6 +288,7 @@ def prep_finance(payments):
 # ==============================================================
 # ✨ [데이터베이스 연결 로직]
 # ==============================================================
+# 🚨 [중요] 선생님의 파이어베이스 주소 입력
 FIREBASE_URL = "https://youth-canvas-default-rtdb.firebaseio.com/data.json"
 
 def load_data():
@@ -533,7 +564,7 @@ elif st.session_state.menu_option == UI['menu3']:
                     st.info("💡 차트의 범례(글씨)를 클릭하면 데이터를 켜고 끌 수 있습니다.")
                     
                     s_chart_options = ["막대 그래프 (프로그램별 성취도) [추천]", "도넛 차트 (나의 종합 출결 비율)", "라인 그래프 (성취도 변화 추이)"]
-                    selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요:", s_chart_options, default=s_chart_options)
+                    selected_s_charts = st.multiselect("📊 보고 싶은 차트를 선택하세요 (다중 선택 가능):", s_chart_options, default=s_chart_options)
                     
                     df_summ, att_counts, trend_data = prep_student_dash(my_data)
                     
@@ -565,8 +596,8 @@ elif st.session_state.menu_option == UI['menu3']:
                                 st.plotly_chart(fig_d, use_container_width=True)
                                 
                                 bad_att = att_counts.get('지각', 0) + att_counts.get('결석', 0)
-                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 완벽한 출석률입니다!</div></div>", unsafe_allow_html=True)
-                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다.</div></div>", unsafe_allow_html=True)
+                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 지각과 결석이 단 한 번도 없습니다! 완벽한 출석률입니다.</div></div>", unsafe_allow_html=True)
+                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다. 성실한 참여를 위해 출결 관리에 신경 써주세요.</div></div>", unsafe_allow_html=True)
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
@@ -611,7 +642,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if changed: 
                                     if save_data(db): st.rerun()
 
-                            st.write(f"#### 💬 1:1 비밀 소통 게시판 ({T_USER} 전용)")
+                            st.write(f"#### 💬 {T_ADMIN}과 1:1 비밀 소통 게시판 ({T_USER} 전용)")
                             chat_box = st.container(border=True, height=250)
                             with chat_box:
                                 if not data.get('messages'): st.info("아직 나눈 대화가 없습니다.")
@@ -625,7 +656,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                     if save_data(db): st.rerun()
 
 # =========================================================
-# [페이지 4] 학부모 공간
+# [페이지 4] 학부모 전용 라운지
 # =========================================================
 elif st.session_state.menu_option == UI['menu4']:
     st.markdown(f"## {UI['page4_title']}")
@@ -835,6 +866,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         if total_att > 0:
                             labels = [k for k, v in att_counts_total.items() if v > 0]
                             sizes = [v for v in att_counts_total.values() if v > 0]
+                            colors = ['#2ECC71', '#FFC107', '#E74C3C', '#9B59B6'][:len(labels)]
                             fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title="통합 출석 현황")
                             fig_d.update_traces(textposition='inside', textinfo='percent+label')
                             st.plotly_chart(fig_d, use_container_width=True)
@@ -883,7 +915,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         corr = df_dash['Comments'].corr(df_dash['AvgScore'])
                         if pd.isna(corr): st.info("📉 데이터 변동성이 부족하여 상관계수를 도출할 수 없습니다.")
                         elif corr >= 0.3: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 피드백(코멘트) 수와 성취도 간에 양의 상관관계(계수: {corr:.2f})가 존재합니다.</div></div>", unsafe_allow_html=True)
-                        elif corr <= -0.3: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트와 성취도가 역상관(계수: {corr:.2f})을 보문을 보입니다. 피드백의 질적 점검이 필요합니다.</div></div>", unsafe_allow_html=True)
+                        elif corr <= -0.3: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 코멘트와 성취도가 역상관(계수: {corr:.2f})을 보입니다. 피드백의 질적 점검이 필요합니다.</div></div>", unsafe_allow_html=True)
                         else: st.markdown(f"<div class='report-box'><div class='info-text'>ℹ️ 특이사항: 피드백 횟수와 성적 간에 뚜렷한 패턴이 관찰되지 않았습니다.</div></div>", unsafe_allow_html=True)
 
                 if "스택 막대 그래프 (출결 상세)" in selected_charts and heat_data:
@@ -1097,7 +1129,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         with st.form("edit_form"):
                             col_m1, col_m2, col_m3 = st.columns(3)
                             new_m_url_input = col_m1.text_input("📺 새 유튜브 링크", value=curr_m_url if curr_m_type == 'url' else "")
-                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (기존 덮어쓰기)", type=['png', 'jpg', 'jpeg'])
+                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (1MB 이하 필수)", type=['png', 'jpg', 'jpeg'])
                             vid_f = col_m3.file_uploader("🎞️ 새 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
                             del_media = st.checkbox("🗑️ 등록된 미디어 완전히 삭제하기 (서버 에러 400 발생 시 체크 필수!)")
                             
@@ -1458,7 +1490,6 @@ elif st.session_state.menu_option == UI['menu5']:
                         
                 st.divider()
                 
-                # ✨ 핵심 픽스: 메인 화면 프로그램 노출 순서 변경 기능 추가
                 st.subheader("🔄 메인 화면 프로그램 노출 순서 변경")
                 st.info("💡 [찾아보기] 탭에 표시되는 프로그램의 순서를 위아래로 조정할 수 있습니다.")
                 if db.get('programs'):
