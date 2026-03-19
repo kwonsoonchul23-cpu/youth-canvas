@@ -52,25 +52,40 @@ st.markdown("""
         font-family: 'KakaoBigSans-ExtraBold', 'Pretendard', 'Malgun Gothic', sans-serif;
     }
     svg, [data-baseweb="icon"], .material-icons { font-family: inherit !important; }
+
     .badge-green { background-color: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-red { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .badge-blue { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; border: 1px solid #c7d2fe; }
     .badge-gray { background-color: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-right: 5px; }
     .card-title { font-size: 1.4em; font-weight: 800; color: #1e293b; margin-bottom: 0.2em; }
+    .card-desc { font-size: 0.95em; color: #64748b; margin-bottom: 1em; }
+    .recruit-period { font-size: 0.85em; color: #b45309; background-color: #fef3c7; padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
+    
     .schedule-table { width: 100%; border-collapse: collapse; font-size: 0.95em; text-align: left; margin-bottom: 10px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .schedule-table th { border-bottom: 2px solid #cbd5e1; padding: 12px; background-color: #f8fafc; font-weight: 800; color: #334155; }
     .schedule-table td { border-bottom: 1px solid #e2e8f0; padding: 12px; color: #1e293b; vertical-align: top; }
+    .schedule-table tr:last-child td { border-bottom: none; }
+    .schedule-table tr:hover { background-color: #f1f5f9; }
+    
     .report-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-top: 10px; background-color: #f8fafc; }
     .pos-text { color: #059669; font-weight: 600; margin-bottom: 5px;}
     .neg-text { color: #dc2626; font-weight: 600; margin-bottom: 5px;}
     .info-text { color: #475569; font-weight: 500;}
+    
+    .crm-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 20px; border-left: 6px solid #2b7a78; }
+    .crm-title { font-size: 1.3em; font-weight: 900; color: #1e293b; margin-bottom: 5px; }
+    .crm-meta { font-size: 0.9em; color: #64748b; margin-bottom: 15px; }
+    .crm-history-box { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #e2e8f0; }
+    .crm-child-name { font-weight: 800; color: #334155; margin-top: 5px; margin-bottom: 5px; }
+    
     .cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .cal-th { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; text-align: center; font-weight: bold; }
     .cal-td { border: 1px solid #cbd5e1; height: 110px; vertical-align: top; padding: 5px; background: #ffffff; }
     .cal-td.empty { background: #f1f5f9; }
     .cal-day-num { font-weight: bold; color: #475569; text-align: right; margin-bottom: 4px; }
-    .cal-event { color: #ffffff; padding: 3px 6px; margin-bottom: 3px; font-size: 0.75em; border-radius: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; transition: all 0.2s ease; }
+    .cal-event { color: #ffffff; padding: 3px 6px; margin-bottom: 3px; font-size: 0.75em; border-radius: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s ease; }
     .cal-event:hover { transform: scale(1.02); filter: brightness(1.15); box-shadow: 0 3px 6px rgba(0,0,0,0.2); }
+
     [data-testid="stSidebar"] { background-color: #261633 !important; }
     [data-testid="stSidebarUserContent"] { padding-left: 1rem !important; padding-right: 1rem !important; padding-top: 3rem !important; }
     [data-testid="stSidebar"] div[role="radiogroup"] > label { width: 100%; min-height: 60px; margin: 0 0 10px 0; padding: 10px 15px; cursor: pointer; border-radius: 12px; display: flex; justify-content: flex-start; align-items: center; transition: all 0.2s ease; }
@@ -92,6 +107,7 @@ def fix_youtube_url(url):
     if not url: return None
     url = url.replace("shorts/", "watch?v=")
     if "youtu.be/" in url: return f"https://www.youtube.com/watch?v={url.split('youtu.be/')[1].split('?')[0]}"
+    if "m.youtube.com" in url: return url.replace("m.youtube.com", "www.youtube.com")
     return url
 
 def get_date_range(task_dict):
@@ -252,9 +268,11 @@ def load_data():
                 if 'payments' not in data: data['payments'] = []
                 if 'admins' not in data: data['admins'] = [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}]
                 if 'settings' not in data: data['settings'] = {}
+                # ✨ api_keys 초기화
+                if 'api_keys' not in data['settings']: data['settings']['api_keys'] = {"public_data": ""}
                 return data
     except: pass
-    return {"programs": [], "users": [], "parents": [], "payments": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {}}
+    return {"programs": [], "users": [], "parents": [], "payments": [], "admins": [{"name": "마스터", "pin": "0000", "role": "super", "programs": []}], "settings": {"api_keys": {"public_data": ""}}}
 
 def save_data(data):
     try: 
@@ -303,6 +321,10 @@ else:
     for k, v in default_ui.items():
         if k not in UI_temp: UI_temp[k] = v
 
+# ✨ api_keys 세팅 확인
+if 'api_keys' not in db['settings']:
+    db['settings']['api_keys'] = {"public_data": ""}
+
 T_SUPER, T_ADMIN, T_STAFF, T_USER, T_PARENT = db['settings']['terms']['super'], db['settings']['terms']['admin'], db['settings']['terms']['staff'], db['settings']['terms']['user'], db['settings']['terms']['parent']
 UI = db['settings']['ui']
 menu_list = [UI['menu1'], UI['menu2'], UI['menu3'], UI['menu4'], UI['menu5']]
@@ -325,7 +347,7 @@ with st.sidebar:
         st.session_state['db'] = load_data(); st.toast("✅ 동기화 완료!"); time.sleep(1); st.rerun()
 st.session_state.menu_option = menu
 
-# ✨ 전역으로 '오늘 날짜' 변수를 설정하여 모든 탭에서 활용 (NameError 방지)
+# ✨ 전역으로 '오늘 날짜' 변수를 설정하여 모든 탭에서 활용
 today_str = datetime.now().strftime("%Y-%m-%d")
 
 # =========================================================
@@ -515,7 +537,7 @@ elif st.session_state.menu_option == UI['menu3']:
                     
                     if "막대 그래프 (프로그램별 성취도) [추천]" in selected_s_charts and not df_summ.empty:
                         with st.container(border=True):
-                            st.markdown("##### 📊 프로그램별 달성률 및 성취도 (막대 그래프)")
+                            st.markdown("##### 📊 프로그램별 달성률 및 성취도")
                             c1, c2 = st.columns(2)
                             fig_s1 = px.bar(df_summ, x='프로그램', y='진행률(%)', color='프로그램', text='진행률(%)', title='활동 진행률')
                             fig_s1.update_traces(textposition='outside'); fig_s1.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
@@ -525,32 +547,32 @@ elif st.session_state.menu_option == UI['menu3']:
                             fig_s2.update_traces(texttemplate='%{text:.1f}', textposition='outside'); fig_s2.update_layout(yaxis=dict(range=[0, 105]), showlegend=False)
                             c2.plotly_chart(fig_s2, use_container_width=True)
 
-                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다. 활동을 시작해보세요!")
+                            if df_summ['진행률(%)'].max() == 0 and df_summ['평균 성취도'].max() == 0: st.info("📉 진행된 목표나 평가가 없습니다.")
                             else: st.markdown(f"<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: '{df_summ.loc[df_summ['진행률(%)'].idxmax()]['프로그램']}'의 달성률이 가장 높습니다! 꾸준한 성실함을 칭찬합니다.</div></div>", unsafe_allow_html=True)
 
                     if "도넛 차트 (나의 종합 출결 비율)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 🍩 나의 종합 출결 비율 (도넛 차트)")
+                            st.markdown("##### 🍩 나의 종합 출결 비율")
                             total_att = sum(att_counts.values())
                             if total_att == 0: st.info("📉 기록된 출결 데이터가 없습니다.")
                             else:
                                 labels = [k for k, v in att_counts.items() if v > 0]
                                 sizes = [v for v in att_counts.values() if v > 0]
                                 fig_d = px.pie(names=labels, values=sizes, hole=0.4, color=labels, color_discrete_map=ATT_COLORS, title=f"총 {total_att}일 출결 기록")
-                                fig_d.update_traces(textposition='inside', textinfo='percent+label')
+                                fig_d.update_traces(textposition='inside', textinfo='percent+label', hoverinfo='label+percent+value')
                                 st.plotly_chart(fig_d, use_container_width=True)
                                 
                                 bad_att = att_counts.get('지각', 0) + att_counts.get('결석', 0)
-                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 지각과 결석이 단 한 번도 없습니다! 완벽한 출석률입니다.</div></div>", unsafe_allow_html=True)
-                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다. 성실한 참여를 위해 출결 관리에 신경 써주세요.</div></div>", unsafe_allow_html=True)
+                                if bad_att == 0: st.markdown("<div class='report-box'><div class='pos-text'>🟢 긍정적 시그널: 완벽한 출석률입니다!</div></div>", unsafe_allow_html=True)
+                                else: st.markdown(f"<div class='report-box'><div class='neg-text'>🔴 주의 요망: 지각/결석이 총 {bad_att}회 있습니다.</div></div>", unsafe_allow_html=True)
 
                     if "라인 그래프 (성취도 변화 추이)" in selected_s_charts:
                         with st.container(border=True):
-                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이 (라인 그래프)")
-                            if len(trend_data) < 2: st.info("📉 성취도 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
+                            st.markdown("##### 📈 시간 흐름별 성취도 변화 추이")
+                            if len(trend_data) < 2: st.info("📉 점수가 2건 이상 누적되어야 추이 그래프를 볼 수 있습니다.")
                             else:
                                 df_trend = pd.DataFrame(trend_data).sort_values(by="날짜")
-                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True)
+                                fig_l = px.line(df_trend, x='날짜', y='점수', color='프로그램', markers=True, hover_data={"점수": True, "날짜": True})
                                 fig_l.update_yaxes(range=[0, 105])
                                 st.plotly_chart(fig_l, use_container_width=True)
                                 
@@ -570,7 +592,7 @@ elif st.session_state.menu_option == UI['menu3']:
                                 total_items += 1; done_items += 1 if t.get('done') else 0
                                 for stask in t.get('subtasks', []): total_items += 1; done_items += 1 if stask.get('done') else 0
                             pct = int((done_items/total_items)*100) if total_items > 0 else 0
-                            st.metric("활동 달성률 (체크리스트)", f"{pct}%", f"{done_items} / {total_items} 완료")
+                            st.metric("활동 달성률", f"{pct}%", f"{done_items} / {total_items} 완료")
                             st.progress(pct / 100)
 
                             st.write("#### ✅ 세부 활동 체크리스트")
@@ -599,7 +621,6 @@ elif st.session_state.menu_option == UI['menu3']:
                                 if c2.form_submit_button("전송") and msg_input:
                                     data.setdefault('messages', []).append({"sender": "user", "content": msg_input})
                                     if save_data(db): st.rerun()
-                elif login_attempt: st.error("정보가 일치하지 않습니다.")
 
 # =========================================================
 # [페이지 4] 학부모 전용 라운지
@@ -841,7 +862,8 @@ elif st.session_state.menu_option == UI['menu5']:
                         df_h['NumericStatus'] = df_h['상태'].map(val_map)
                         pivot_h = df_h.pivot_table(index='학생명', columns='날짜', values='NumericStatus', fill_value=0)
                         
-                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
+                        fig_h = px.imshow(pivot_h, labels=dict(x="날짜", y="학생명", color="상태(수치)"), 
+                                          x=pivot_h.columns, y=pivot_h.index, aspect="auto", color_continuous_scale="RdYlGn")
                         st.plotly_chart(fig_h, use_container_width=True)
                         
                         bad_days = (df_h['상태'].isin(['결석', '병결'])).sum()
@@ -945,14 +967,15 @@ elif st.session_state.menu_option == UI['menu5']:
 
             with tab_create:
                 st.subheader("➕ 신규 프로그램 개설")
+                
                 with st.form("create_form"):
                     st.markdown("##### 🎬 1. 미디어 첨부 (선택)")
-                    st.warning("🚨 **[필독] 동영상 및 고용량 이미지 첨부 시 주의사항**\n\n현재 서버는 무료 텍스트 데이터베이스를 사용 중입니다. 용량이 1MB만 넘어가도 지원자들의 **수강신청이 에러(400)를 내며 튕길 수 있습니다.**\n\n* **완벽한 해결책:** 유튜브 영상이나 구글 드라이브 사진 링크를 **[유튜브 링크]**란에 붙여넣는 것이 가장 빠르고 안전합니다.")
+                    st.warning("🚨 **[필독] 동영상 직접 업로드의 한계 및 대안**\n\n현재 시스템은 무료 텍스트 데이터베이스를 사용 중입니다. 영상(mp4)을 올리면 서버 과부하로 지원자들의 **수강신청이 에러(400)를 내며 튕길 수 있습니다.**\n\n* **해결책:** 유튜브에 영상을 '일부 공개'로 올리신 후 **[유튜브 링크]**란에 붙여넣는 것이 가장 빠르고 안전합니다. (이미지는 1MB 이하만 권장합니다.)")
                     
                     col_m1, col_m2, col_m3 = st.columns(3)
-                    new_m_url_input = col_m1.text_input("📺 유튜브/외부 링크 (가장 안전)", placeholder="https://youtu.be/...")
-                    img_f = col_m2.file_uploader("🖼️ 직접 이미지 (1MB 이하 필수)", type=['png', 'jpg', 'jpeg'])
-                    vid_f = col_m3.file_uploader("🎞️ 직접 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
+                    new_m_url_input = col_m1.text_input("📺 유튜브 링크 (가장 안전)", placeholder="https://youtu.be/...")
+                    img_f = col_m2.file_uploader("🖼️ 이미지 (1MB 이하 필수)", type=['png', 'jpg', 'jpeg'])
+                    vid_f = col_m3.file_uploader("🎞️ 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
                             
                     st.divider()
                     st.markdown("##### 📝 2. 프로그램 기본 정보")
@@ -968,14 +991,14 @@ elif st.session_state.menu_option == UI['menu5']:
 2026-03-23 (14:00~16:00) : 1차 특강
 2026-03-30 (17:30~19:30) : 2차 특강
 - 세부 목표 (하이픈으로 시작)"""
-                    st.info("💡 **시간은 반드시 소괄호 `( )` 안에 적어주세요!** (예: `2026-03-23 (14:00) : OT`)")
+                    st.info("💡 **시간은 반드시 소괄호 `( )` 안에 적어주세요!** 그래야 시스템이 정확하게 인식합니다. (예: `2026-03-23 (14:00) : OT`)")
                     w_input = st.text_area("워크플로우 양식", value=w_input_placeholder, height=200)
                     
                     if st.form_submit_button("✨ 최종 개설하기", type="primary"):
                         final_m_url = ""
                         new_m_type = "url"
                         
-                        if img_f and img_f.size > 1024 * 1024:
+                        if img_f and img_f.size > 1 * 1024 * 1024:
                             st.error("🚨 이미지 용량이 1MB를 초과합니다! 용량을 줄여서 다시 올려주세요.")
                             st.stop()
                             
@@ -1070,8 +1093,8 @@ elif st.session_state.menu_option == UI['menu5']:
                         
                         with st.form("edit_form"):
                             col_m1, col_m2, col_m3 = st.columns(3)
-                            new_m_url_input = col_m1.text_input("📺 새 외부 링크 (가장 안전)", value=curr_m_url if curr_m_type == 'url' else "")
-                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (1MB 이하)", type=['png', 'jpg', 'jpeg'])
+                            new_m_url_input = col_m1.text_input("📺 새 유튜브 링크", value=curr_m_url if curr_m_type == 'url' else "")
+                            img_f = col_m2.file_uploader("🖼️ 새 이미지 (1MB 이하 필수)", type=['png', 'jpg', 'jpeg'])
                             vid_f = col_m3.file_uploader("🎞️ 새 동영상 (업로드 차단됨)", type=['mp4', 'mov'], disabled=True)
                             del_media = st.checkbox("🗑️ 등록된 미디어 완전히 삭제하기 (서버 에러 400 발생 시 체크 필수!)")
                             
@@ -1093,7 +1116,7 @@ elif st.session_state.menu_option == UI['menu5']:
                                 final_m_url = curr_m_url
                                 new_m_type = curr_m_type
                                 
-                                if img_f and img_f.size > 1024 * 1024:
+                                if img_f and img_f.size > 1 * 1024 * 1024:
                                     st.error("🚨 이미지 용량이 1MB를 초과합니다! 용량을 줄여서 다시 올려주세요.")
                                     st.stop()
                                     
@@ -1287,7 +1310,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         else: st.info("아직 기록된 출석 데이터가 없습니다.")
                             
                     with att_sub3:
-                        att_user_options = {f"{u['name']} ({u['role']})": i for i, u in pu}
+                        att_user_options = {f"{u.get('alias') or u['name']} ({u['role']})": i for i, u in pu}
                         selected_user_label = st.selectbox(f"🎓 수정할 {T_USER} 선택", list(att_user_options.keys()), key="att_edit_user")
                         target_idx = att_user_options[selected_user_label]
                         target_user = db['users'][target_idx]
@@ -1408,7 +1431,7 @@ elif st.session_state.menu_option == UI['menu5']:
                         if save_data(db): st.rerun()
 
         # ---------------------------------------------------------
-        # 오직 Super 관리자만 접근 가능한 탭 (UI 화면 설정)
+        # 오직 Super 관리자만 접근 가능한 탭 (UI/외부 API 연동)
         if is_super:
             with tab_ui:
                 st.subheader("🎨 화면 UI 텍스트 수정")
@@ -1429,6 +1452,21 @@ elif st.session_state.menu_option == UI['menu5']:
                         UI['brand_title'] = u1; UI['brand_subtitle'] = u1_sub
                         UI['menu1'] = u2; UI['menu2'] = u2_2; UI['menu3'] = u3; UI['menu4'] = u4; UI['menu5'] = u5
                         save_data(db); st.session_state.menu_option = u5; st.rerun()
+                        
+                st.divider()
+                st.subheader("🔑 외부 API 연동 설정")
+                st.info("💡 공공데이터포털 등의 외부 서비스 API 키를 입력하여 연동합니다. 여기에 입력된 키는 안전하게 데이터베이스에 저장됩니다.")
+                with st.form("api_key_form"):
+                    current_key = db['settings'].get('api_keys', {}).get('public_data', '')
+                    new_api_key = st.text_input("공공데이터포털 API Key (Decoding/Encoding 무관)", value=current_key, type="password")
+                    if st.form_submit_button("API 키 저장 및 적용", type="primary"):
+                        if 'api_keys' not in db['settings']:
+                            db['settings']['api_keys'] = {}
+                        db['settings']['api_keys']['public_data'] = new_api_key
+                        if save_data(db):
+                            st.success("API 키가 데이터베이스에 안전하게 저장되었습니다!")
+                            time.sleep(1)
+                            st.rerun()
 
         # ---------------------------------------------------------
         # 공통 계정 관리 탭
